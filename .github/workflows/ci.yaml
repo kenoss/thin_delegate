@@ -1,0 +1,59 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+jobs:
+  test:
+    name: test
+    env:
+      RUST_BACKTRACE: 1
+    runs-on: ubuntu-latest
+    steps:
+    - name: git checkout
+      uses: actions/checkout@v4
+
+    - name: rustup toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: cargo install just
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: just
+        version: '1.34.0'
+
+    - run: just test
+
+  check-strict:
+    runs-on: ubuntu-latest
+    steps:
+    - name: git checkout
+      uses: actions/checkout@v4
+
+    - name: rustup toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt,clippy
+
+    - name: cargo install just
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: just
+        version: '1.34.0'
+
+    - run: just check-strict
+
+  check-doc:
+    runs-on: ubuntu-latest
+    steps:
+    - name: git checkout
+      uses: actions/checkout@v4
+
+    - name: rustup toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt,clippy
+
+    - name: Check documentation
+      run: RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --document-private-items --workspace
