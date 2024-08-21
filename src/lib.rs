@@ -1,5 +1,6 @@
 mod storage;
 
+use crate::storage::Storage;
 use indoc::indoc;
 use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
@@ -47,14 +48,19 @@ pub fn register(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as syn::Item);
+    let mut storage = Storage::global();
 
-    match register_aux(args.into(), &item) {
+    match register_aux(&mut storage, args.into(), &item) {
         Ok(x) => x.into(),
         Err(e) => TokenStream::from_iter([e.into_compile_error(), (quote! { #item })]).into(),
     }
 }
 
-fn register_aux(args: TokenStream, item: &syn::Item) -> syn::Result<TokenStream> {
+fn register_aux(
+    storage: &mut Storage,
+    args: TokenStream,
+    item: &syn::Item,
+) -> syn::Result<TokenStream> {
     if args.is_empty() {
         return Err(syn::Error::new_spanned(
             args,
@@ -91,7 +97,7 @@ fn register_aux(args: TokenStream, item: &syn::Item) -> syn::Result<TokenStream>
         })
         .collect_vec();
 
-    storage::store(&path, &fn_ingredients)?;
+    storage.store(&path, &fn_ingredients)?;
 
     // TODO: Split `register()` and `register_temporarily()` and return tokens for the former.
     Ok(TokenStream::new())
@@ -103,14 +109,19 @@ pub fn derive_delegate(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let item = parse_macro_input!(input as syn::Item);
+    let mut storage = Storage::global();
 
-    match derive_delegate_aux(args.into(), &item) {
+    match derive_delegate_aux(&mut storage, args.into(), &item) {
         Ok(x) => x.into(),
         Err(e) => TokenStream::from_iter([e.into_compile_error(), (quote! { #item })]).into(),
     }
 }
 
-fn derive_delegate_aux(args: TokenStream, item: &syn::Item) -> syn::Result<TokenStream> {
+fn derive_delegate_aux(
+    storage: &mut Storage,
+    args: TokenStream,
+    item: &syn::Item,
+) -> syn::Result<TokenStream> {
     if args.is_empty() {
         return Err(syn::Error::new_spanned(
             args,
@@ -125,7 +136,7 @@ fn derive_delegate_aux(args: TokenStream, item: &syn::Item) -> syn::Result<Token
         )
     })?;
 
-    let Some(fn_ingredients) = storage::get(&path) else {
+    let Some(fn_ingredients) = storage.get(&path) else {
         return Err(syn::Error::new(
             Span::call_site(),
             format!(
@@ -213,4 +224,135 @@ fn gen_impl_fn(fn_ingredient: &FnIngredient, item: &syn::Item) -> syn::Result<To
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::TestStorageFactory;
+
+    macro_rules! compare_result {
+        ($got:expr, $expected:expr) => {
+            let expected: syn::Result<TokenStream> = $expected;
+            assert_eq!(
+                ($got).map(|x| x.to_string()).map_err(|e| e.to_string()),
+                expected.map(|x| x.to_string()).map_err(|e| e.to_string())
+            );
+        };
+    }
+
+    macro_rules! test_register_derive_delegate {
+        ($test_name:ident,
+         $register_args:expr,
+         $register_input:expr,
+         $register_expected:expr,
+         $derive_delegate_args:expr,
+         $derive_delegate_input:expr,
+         $derive_delegate_expected:expr) => {
+            #[test]
+            fn $test_name() -> Result<(), syn::Error> {
+                let mut factory = TestStorageFactory::new();
+                let mut storage = factory.factory();
+
+                let args = $register_args;
+                let input = $register_input;
+                compare_result!(
+                    register_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
+                    Ok($register_expected)
+                );
+
+                let args = $derive_delegate_args;
+                let input = $derive_delegate_input;
+                compare_result!(
+                    derive_delegate_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
+                    Ok($derive_delegate_expected)
+                );
+
+                Ok(())
+            }
+        };
+    }
+
+    test_register_derive_delegate! {
+        test_basic,
+        // register
+        quote! { ToString },
+        quote! {
+            pub trait ToString {
+                /// Converts the given value to a `String`.
+                ///
+                /// # Examples
+                ///
+                /// ```
+                /// let i = 5;
+                /// let five = String::from("5");
+                ///
+                /// assert_eq!(five, i.to_string());
+                /// ```
+                #[rustc_conversion_suggestion]
+                #[stable(feature = "rust1", since = "1.0.0")]
+                #[cfg_attr(not(test), rustc_diagnostic_item = "to_string_method")]
+                fn to_string(&self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { ToString },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl ToString for Hoge {
+                fn to_string(& self) -> String {
+                    match self {
+                        Self::A(x) => ToString::to_string(x),
+                        Self::B(x) => ToString::to_string(x),
+                    }
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_method_with_args,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello {
+                fn hello(&self, prefix: &str) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl Hello for Hoge {
+                fn hello(&self, prefix: &str) -> String {
+                    match self {
+                        Self::A(x) => Hello::hello(x, prefix),
+                        Self::B(x) => Hello::hello(x, prefix),
+                    }
+                }
+            }
+        }
+    }
 }
