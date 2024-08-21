@@ -276,28 +276,15 @@ mod tests {
     test_register_derive_delegate! {
         test_basic,
         // register
-        quote! { ToString },
+        quote! { Hello },
         quote! {
-            pub trait ToString {
-                /// Converts the given value to a `String`.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// let i = 5;
-                /// let five = String::from("5");
-                ///
-                /// assert_eq!(five, i.to_string());
-                /// ```
-                #[rustc_conversion_suggestion]
-                #[stable(feature = "rust1", since = "1.0.0")]
-                #[cfg_attr(not(test), rustc_diagnostic_item = "to_string_method")]
-                fn to_string(&self) -> String;
+            pub trait Hello {
+                fn hello(&self) -> String;
             }
         },
         quote! {},
         // derive_delegate
-        quote! { ToString },
+        quote! { Hello },
         quote! {
             enum Hoge {
                 A(String),
@@ -310,11 +297,11 @@ mod tests {
                 B(char),
             }
 
-            impl ToString for Hoge {
-                fn to_string(& self) -> String {
+            impl Hello for Hoge {
+                fn hello(&self) -> String {
                     match self {
-                        Self::A(x) => ToString::to_string(x),
-                        Self::B(x) => ToString::to_string(x),
+                        Self::A(x) => Hello::hello(x),
+                        Self::B(x) => Hello::hello(x),
                     }
                 }
             }
