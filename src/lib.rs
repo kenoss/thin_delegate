@@ -152,14 +152,20 @@ fn derive_delegate_aux(
 
     let funcs = fn_ingredients
         .iter()
-        .map(|fn_ingredient| gen_impl_fn(fn_ingredient, item))
+        .map(|fn_ingredient| gen_impl_fn(item, fn_ingredient))
         .collect::<syn::Result<Vec<_>>>()?;
 
-    let syn::Item::Enum(enum_) = item else {
-        return Err(syn::Error::new(item.span(), "expected `enum ...`"));
+    let item_ident = match item {
+        syn::Item::Enum(enum_) => &enum_.ident,
+        syn::Item::Struct(struct_) => &struct_.ident,
+        _ => {
+            return Err(syn::Error::new(
+                item.span(),
+                "expected `enum ...` or `struct ...`",
+            ));
+        }
     };
 
-    let item_ident = &enum_.ident;
     Ok(quote! {
         #item
 
@@ -169,11 +175,21 @@ fn derive_delegate_aux(
     })
 }
 
-fn gen_impl_fn(fn_ingredient: &FnIngredient, item: &syn::Item) -> syn::Result<TokenStream> {
-    let syn::Item::Enum(enum_) = item else {
-        return Err(syn::Error::new(item.span(), "expected `enum ...`"));
-    };
+fn gen_impl_fn(item: &syn::Item, fn_ingredient: &FnIngredient) -> syn::Result<TokenStream> {
+    match item {
+        syn::Item::Enum(enum_) => gen_impl_fn_enum(enum_, fn_ingredient),
+        syn::Item::Struct(struct_) => gen_impl_fn_struct(struct_, fn_ingredient),
+        _ => Err(syn::Error::new(
+            item.span(),
+            "expected `enum ...` or `struct ...`",
+        )),
+    }
+}
 
+fn gen_impl_fn_enum(
+    enum_: &syn::ItemEnum,
+    fn_ingredient: &FnIngredient,
+) -> syn::Result<TokenStream> {
     let args = fn_ingredient
         .sig
         .inputs
@@ -222,6 +238,73 @@ fn gen_impl_fn(fn_ingredient: &FnIngredient, item: &syn::Item) -> syn::Result<To
             match self {
                 #(#match_arms,)*
             }
+        }
+    })
+}
+
+fn gen_impl_fn_struct(
+    struct_: &syn::ItemStruct,
+    fn_ingredient: &FnIngredient,
+) -> syn::Result<TokenStream> {
+    let args = fn_ingredient
+        .sig
+        .inputs
+        .iter()
+        .filter_map(|arg| match arg {
+            syn::FnArg::Receiver(_) => None,
+            syn::FnArg::Typed(pat_type) => {
+                let syn::Pat::Ident(ident) = pat_type.pat.as_ref() else {
+                    panic!("Pat should be an ident in function declaration position.");
+                };
+                Some(ident)
+            }
+        })
+        .collect_vec();
+
+    let field_ident = {
+        if struct_.fields.len() != 1 {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "struct must have exact one field.",
+            ));
+        }
+
+        match &struct_.fields.iter().next().unwrap().ident {
+            Some(ident) => quote! { #ident },
+            None => quote! { 0 },
+        }
+    };
+    let receiver = {
+        if fn_ingredient.sig.inputs.len() == 0 {
+            // TODO: Fail early.
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "method must have arguments.",
+            ));
+        }
+
+        let syn::FnArg::Receiver(r) = &fn_ingredient.sig.inputs[0] else {
+            // TODO: Fail early.
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "method must have receiver",
+            ));
+        };
+
+        match (&r.reference, &r.mutability) {
+            (Some(_), Some(_)) => quote! { &mut self.#field_ident },
+            (Some(_), None) => quote! { &self.#field_ident },
+            (None, Some(_)) => quote! { self.#field_ident },
+            (None, None) => quote! { self.#field_ident },
+        }
+    };
+
+    let sig = &fn_ingredient.sig;
+    let trait_name = &fn_ingredient.trait_name;
+    let method_ident = &fn_ingredient.ident;
+    Ok(quote! {
+        #sig {
+            #trait_name::#method_ident(#receiver #(,#args)*)
         }
     })
 }
@@ -303,6 +386,122 @@ mod tests {
                         Self::A(x) => Hello::hello(x),
                         Self::B(x) => Hello::hello(x),
                     }
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_struct_with_named_field,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello {
+                fn hello(&self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+        },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+
+            impl Hello for Hoge {
+                fn hello(&self) -> String {
+                    Hello::hello(&self.s)
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_struct_with_unnamed_field,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello {
+                fn hello(&self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            struct Hoge(String);
+        },
+        quote! {
+            struct Hoge(String);
+
+            impl Hello for Hoge {
+                fn hello(&self) -> String {
+                    Hello::hello(&self.0)
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_struct_ref_mut_receiver,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello {
+                fn hello(&mut self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+        },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+
+            impl Hello for Hoge {
+                fn hello(&mut self) -> String {
+                    Hello::hello(&mut self.s)
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_struct_consume_receiver,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello {
+                fn hello(self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+        },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+
+            impl Hello for Hoge {
+                fn hello(self) -> String {
+                    Hello::hello(self.s)
                 }
             }
         }
