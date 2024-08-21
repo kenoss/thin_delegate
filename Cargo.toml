@@ -2,5 +2,26 @@
 name = "thin_delegate"
 version = "0.0.0"
 edition = "2021"
+authors = ["keno (Ken Okada) <keno.ss57@gmail.com>"]
+categories = ["rust-patterns"]
+description = "Auto implementation of trivial delegation to inner types"
+documentation = "https://docs.rs/thin_delegate"
+keywords = ["proc-macro", "delegate"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/kenoss/thin_delegate"
+rust-version = "1.80.0"
+
+[lib]
+proc-macro = true
+
+[[test]]
+name = "tests"
+path = "tests/test.rs"
 
 [dependencies]
+indoc = "2.0.5"
+itertools = "0.13.0"
+proc-macro2 = "1.0.86"
+quote = "1.0.36"
+syn = { version = "2.0.72", features = ["full", "extra-traits", "visit-mut"] }
+trybuild = "1.0.97"

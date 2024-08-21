@@ -1,0 +1,9 @@
+error: trait not registered: path = ToString
+
+       hint: Add `#[thin_delegate::register(ToString)]` for trait `ToString`
+ --> tests/ui/fail_register_missing.rs:1:1
+  |
+1 | #[thin_delegate::derive_delegate(ToString)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
