@@ -42,6 +42,38 @@ impl From<&StorableFnIngredient> for FnIngredient {
     }
 }
 
+impl FnIngredient {
+    pub fn validate(&self) -> syn::Result<()> {
+        self.receiver_prefix()?;
+
+        Ok(())
+    }
+
+    pub fn receiver_prefix(&self) -> syn::Result<TokenStream> {
+        if self.sig.inputs.is_empty() {
+            return Err(syn::Error::new_spanned(
+                &self.sig.inputs,
+                "method must have arguments.",
+            ));
+        }
+
+        let syn::FnArg::Receiver(r) = &self.sig.inputs[0] else {
+            return Err(syn::Error::new_spanned(
+                &self.sig.inputs[0],
+                "method must have receiver",
+            ));
+        };
+
+        let ret = match (&r.reference, &r.mutability) {
+            (Some(_), Some(_)) => quote! { &mut },
+            (Some(_), None) => quote! { & },
+            (None, Some(_)) => quote! {},
+            (None, None) => quote! {},
+        };
+        Ok(ret)
+    }
+}
+
 #[proc_macro_attribute]
 pub fn register(
     args: proc_macro::TokenStream,
@@ -96,6 +128,9 @@ fn register_aux(
             Some(fn_ingredient)
         })
         .collect_vec();
+    for fn_ingredient in &fn_ingredients {
+        fn_ingredient.validate()?;
+    }
 
     storage.store(&path, &fn_ingredients)?;
 
@@ -274,30 +309,8 @@ fn gen_impl_fn_struct(
             None => quote! { 0 },
         }
     };
-    let receiver = {
-        if fn_ingredient.sig.inputs.len() == 0 {
-            // TODO: Fail early.
-            return Err(syn::Error::new(
-                Span::call_site(),
-                "method must have arguments.",
-            ));
-        }
-
-        let syn::FnArg::Receiver(r) = &fn_ingredient.sig.inputs[0] else {
-            // TODO: Fail early.
-            return Err(syn::Error::new(
-                Span::call_site(),
-                "method must have receiver",
-            ));
-        };
-
-        match (&r.reference, &r.mutability) {
-            (Some(_), Some(_)) => quote! { &mut self.#field_ident },
-            (Some(_), None) => quote! { &self.#field_ident },
-            (None, Some(_)) => quote! { self.#field_ident },
-            (None, None) => quote! { self.#field_ident },
-        }
-    };
+    let receiver_prefix = fn_ingredient.receiver_prefix().unwrap();
+    let receiver = quote! { #receiver_prefix self.#field_ident };
 
     let sig = &fn_ingredient.sig;
     let trait_name = &fn_ingredient.trait_name;
