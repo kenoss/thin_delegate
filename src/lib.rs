@@ -1,5 +1,7 @@
+mod punctuated_parser;
 mod storage;
 
+use crate::punctuated_parser::PunctuatedParser;
 use crate::storage::Storage;
 use indoc::indoc;
 use itertools::Itertools;
@@ -180,14 +182,26 @@ fn derive_delegate_aux(
         ));
     }
 
-    let path = syn::parse2::<syn::Path>(args.clone()).map_err(|_| {
-        syn::Error::new_spanned(
-            args,
-            "type argument expected: `#[thin_delegate::derive_delegate(Type)]`",
-        )
-    })?;
+    let paths = syn::parse2::<PunctuatedParser<syn::Path, syn::token::Comma>>(args)?.into_inner();
 
-    let Some(fn_ingredients) = storage.get(&path) else {
+    let impls = paths
+        .iter()
+        .map(|path| derive_delegate_aux_1(storage, item, path))
+        .collect::<syn::Result<Vec<_>>>()?;
+
+    Ok(quote! {
+        #item
+
+        #(#impls)*
+    })
+}
+
+fn derive_delegate_aux_1(
+    storage: &mut Storage,
+    item: &syn::Item,
+    path: &syn::Path,
+) -> syn::Result<TokenStream> {
+    let Some(fn_ingredients) = storage.get(path) else {
         return Err(syn::Error::new(
             Span::call_site(),
             format!(
@@ -218,8 +232,6 @@ fn derive_delegate_aux(
     };
 
     Ok(quote! {
-        #item
-
         impl #path for #item_ident {
             #(#funcs)*
         }
@@ -343,6 +355,48 @@ mod tests {
                 compare_result!(
                     register_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
                     Ok($register_expected)
+                );
+
+                let args = $derive_delegate_args;
+                let input = $derive_delegate_input;
+                compare_result!(
+                    derive_delegate_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
+                    Ok($derive_delegate_expected)
+                );
+
+                Ok(())
+            }
+        };
+    }
+
+    macro_rules! test_register_register_derive_delegate {
+        ($test_name:ident,
+         $register1_args:expr,
+         $register1_input:expr,
+         $register1_expected:expr,
+         $register2_args:expr,
+         $register2_input:expr,
+         $register2_expected:expr,
+         $derive_delegate_args:expr,
+         $derive_delegate_input:expr,
+         $derive_delegate_expected:expr) => {
+            #[test]
+            fn $test_name() -> Result<(), syn::Error> {
+                let mut factory = TestStorageFactory::new();
+                let mut storage = factory.factory();
+
+                let args = $register1_args;
+                let input = $register1_input;
+                compare_result!(
+                    register_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
+                    Ok($register1_expected)
+                );
+
+                let args = $register2_args;
+                let input = $register2_input;
+                compare_result!(
+                    register_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
+                    Ok($register2_expected)
                 );
 
                 let args = $derive_delegate_args;
@@ -635,6 +689,71 @@ mod tests {
             enum Hoge {
                 A(String),
                 B(char),
+            }
+
+            impl Hello for Hoge {
+                fn hello(&self) -> String {
+                    match self {
+                        Self::A(x) => Hello::hello(x),
+                        Self::B(x) => Hello::hello(x),
+                    }
+                }
+            }
+        }
+    }
+
+    test_register_register_derive_delegate! {
+        test_multiple_derive,
+        // register
+        quote! { ToString },
+        quote! {
+            pub trait ToString {
+                /// Converts the given value to a `String`.
+                ///
+                /// # Examples
+                ///
+                /// ```
+                /// let i = 5;
+                /// let five = String::from("5");
+                ///
+                /// assert_eq!(five, i.to_string());
+                /// ```
+                #[rustc_conversion_suggestion]
+                #[stable(feature = "rust1", since = "1.0.0")]
+                #[cfg_attr(not(test), rustc_diagnostic_item = "to_string_method")]
+                fn to_string(&self) -> String;
+            }
+        },
+        quote! {},
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello: ToString {
+                fn hello(&self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { ToString, Hello },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl ToString for Hoge {
+                fn to_string(&self) -> String {
+                    match self {
+                        Self::A(x) => ToString::to_string(x),
+                        Self::B(x) => ToString::to_string(x),
+                    }
+                }
             }
 
             impl Hello for Hoge {
