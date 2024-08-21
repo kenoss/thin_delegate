@@ -358,7 +358,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_basic,
+        test_enum,
         // register
         quote! { Hello },
         quote! {
@@ -383,6 +383,76 @@ mod tests {
 
             impl Hello for Hoge {
                 fn hello(&self) -> String {
+                    match self {
+                        Self::A(x) => Hello::hello(x),
+                        Self::B(x) => Hello::hello(x),
+                    }
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_enum_ref_mut_receiver,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello {
+                fn hello(&mut self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl Hello for Hoge {
+                fn hello(&mut self) -> String {
+                    match self {
+                        Self::A(x) => Hello::hello(x),
+                        Self::B(x) => Hello::hello(x),
+                    }
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_enum_consume_receiver,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello {
+                fn hello(self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl Hello for Hoge {
+                fn hello(self) -> String {
                     match self {
                         Self::A(x) => Hello::hello(x),
                         Self::B(x) => Hello::hello(x),
