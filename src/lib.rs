@@ -612,4 +612,39 @@ mod tests {
             }
         }
     }
+
+    test_register_derive_delegate! {
+        test_super_crate,
+        // register
+        quote! { Hello },
+        quote! {
+            pub trait Hello: ToString {
+                fn hello(&self) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl Hello for Hoge {
+                fn hello(&self) -> String {
+                    match self {
+                        Self::A(x) => Hello::hello(x),
+                        Self::B(x) => Hello::hello(x),
+                    }
+                }
+            }
+        }
+    }
 }
