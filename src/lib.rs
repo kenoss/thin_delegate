@@ -72,6 +72,22 @@ impl FnIngredient {
         };
         Ok(ret)
     }
+
+    pub fn args(&self) -> Vec<&syn::PatIdent> {
+        self.sig
+            .inputs
+            .iter()
+            .filter_map(|arg| match arg {
+                syn::FnArg::Receiver(_) => None,
+                syn::FnArg::Typed(pat_type) => {
+                    let syn::Pat::Ident(ident) = pat_type.pat.as_ref() else {
+                        panic!("Pat should be an ident in function declaration position.");
+                    };
+                    Some(ident)
+                }
+            })
+            .collect()
+    }
 }
 
 #[proc_macro_attribute]
@@ -225,23 +241,9 @@ fn gen_impl_fn_enum(
     enum_: &syn::ItemEnum,
     fn_ingredient: &FnIngredient,
 ) -> syn::Result<TokenStream> {
-    let args = fn_ingredient
-        .sig
-        .inputs
-        .iter()
-        .filter_map(|arg| match arg {
-            syn::FnArg::Receiver(_) => None,
-            syn::FnArg::Typed(pat_type) => {
-                let syn::Pat::Ident(ident) = pat_type.pat.as_ref() else {
-                    panic!("Pat should be an ident in function declaration position.");
-                };
-                Some(ident)
-            }
-        })
-        .collect_vec();
-
     let trait_name = &fn_ingredient.trait_name;
     let method_ident = &fn_ingredient.ident;
+    let args = fn_ingredient.args();
     let match_arms = enum_
         .variants
         .iter()
@@ -281,21 +283,6 @@ fn gen_impl_fn_struct(
     struct_: &syn::ItemStruct,
     fn_ingredient: &FnIngredient,
 ) -> syn::Result<TokenStream> {
-    let args = fn_ingredient
-        .sig
-        .inputs
-        .iter()
-        .filter_map(|arg| match arg {
-            syn::FnArg::Receiver(_) => None,
-            syn::FnArg::Typed(pat_type) => {
-                let syn::Pat::Ident(ident) = pat_type.pat.as_ref() else {
-                    panic!("Pat should be an ident in function declaration position.");
-                };
-                Some(ident)
-            }
-        })
-        .collect_vec();
-
     let field_ident = {
         if struct_.fields.len() != 1 {
             return Err(syn::Error::new(
@@ -315,6 +302,7 @@ fn gen_impl_fn_struct(
     let sig = &fn_ingredient.sig;
     let trait_name = &fn_ingredient.trait_name;
     let method_ident = &fn_ingredient.ident;
+    let args = fn_ingredient.args();
     Ok(quote! {
         #sig {
             #trait_name::#method_ident(#receiver #(,#args)*)
