@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use syn::visit_mut::VisitMut;
 
 pub(crate) struct GenericParamReplacer {
-    replace_by: HashMap<syn::TypePath, syn::TypePath>,
+    replace_by: HashMap<syn::TypePath, syn::Type>,
 }
 
 impl GenericParamReplacer {
@@ -66,13 +66,17 @@ impl GenericParamReplacer {
 
         let mut replace_by = HashMap::new();
         for (o, s) in izip!(orig.args.iter(), subst.args.iter()) {
-            let syn::GenericArgument::Type(syn::Type::Path(o)) = o else {
-                todo!();
-            };
-            let syn::GenericArgument::Type(syn::Type::Path(s)) = s else {
-                todo!();
-            };
-            replace_by.insert(o.clone(), s.clone());
+            match o {
+                syn::GenericArgument::Type(syn::Type::Path(o)) => {
+                    let syn::GenericArgument::Type(s) = s else {
+                        todo!();
+                    };
+                    replace_by.insert(o.clone(), s.clone());
+                }
+                _ => {
+                    todo!();
+                }
+            }
         }
 
         Ok(Self { replace_by })
@@ -88,13 +92,63 @@ impl GenericParamReplacer {
 }
 
 struct Visitor<'a> {
-    replace_by: &'a HashMap<syn::TypePath, syn::TypePath>,
+    replace_by: &'a HashMap<syn::TypePath, syn::Type>,
 }
 
 impl VisitMut for Visitor<'_> {
-    fn visit_type_path_mut(&mut self, node: &mut syn::TypePath) {
-        if let Some(subst) = self.replace_by.get(node) {
-            *node = subst.clone();
+    // Use `visit_type_mut()` as we need to change enum variant when it matches.
+    fn visit_type_mut(&mut self, node: &mut syn::Type) {
+        match node {
+            syn::Type::Array(x) => {
+                self.visit_type_array_mut(x);
+            }
+            syn::Type::BareFn(x) => {
+                self.visit_type_bare_fn_mut(x);
+            }
+            syn::Type::Group(x) => {
+                self.visit_type_group_mut(x);
+            }
+            syn::Type::ImplTrait(x) => {
+                self.visit_type_impl_trait_mut(x);
+            }
+            syn::Type::Infer(x) => {
+                self.visit_type_infer_mut(x);
+            }
+            syn::Type::Macro(x) => {
+                self.visit_type_macro_mut(x);
+            }
+            syn::Type::Never(x) => {
+                self.visit_type_never_mut(x);
+            }
+            syn::Type::Paren(x) => {
+                self.visit_type_paren_mut(x);
+            }
+            syn::Type::Path(x) => {
+                if let Some(subst) = self.replace_by.get(x) {
+                    *node = subst.clone();
+                }
+            }
+            syn::Type::Ptr(x) => {
+                self.visit_type_ptr_mut(x);
+            }
+            syn::Type::Reference(x) => {
+                self.visit_type_reference_mut(x);
+            }
+            syn::Type::Slice(x) => {
+                self.visit_type_slice_mut(x);
+            }
+            syn::Type::TraitObject(x) => {
+                self.visit_type_trait_object_mut(x);
+            }
+            syn::Type::Tuple(x) => {
+                self.visit_type_tuple_mut(x);
+            }
+            syn::Type::Verbatim(_x) => {
+                // nop
+            }
+            _ => {
+                unimplemented!("`syn::Type` is `non_exhaustive`. Allow compile and raise an error for new arms. Please file a bug when new ones are added.");
+            }
         }
     }
 }

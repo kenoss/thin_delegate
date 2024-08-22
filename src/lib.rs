@@ -858,4 +858,32 @@ mod tests {
             }
         }
     }
+
+    test_register_derive_delegate! {
+        test_generics_specilize_array_of_u8,
+        // register
+        quote! { AsRef<T> },
+        quote! {
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { AsRef<[u8]> },
+        quote! {
+            struct Hoge(String);
+        },
+        quote! {
+            struct Hoge(String);
+
+            impl AsRef<[u8]> for Hoge {
+                fn as_ref(&self) -> &[u8] {
+                    AsRef::as_ref(&self.0)
+                }
+            }
+        }
+    }
 }
