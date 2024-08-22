@@ -438,6 +438,33 @@ mod tests {
         };
     }
 
+    macro_rules! test_as_ref {
+        (
+            $test_name:ident,
+            $derive_delegate_args:expr,
+            $derive_delegate_input:expr,
+            $derive_delegate_expected:expr,
+        ) => {
+            test_register_derive_delegate! {
+                $test_name,
+                // register
+                quote! { AsRef<T> },
+                quote! {
+                    pub trait AsRef<T: ?Sized> {
+                        /// Converts this type into a shared reference of the (usually inferred) input type.
+                        #[stable(feature = "rust1", since = "1.0.0")]
+                        fn as_ref(&self) -> &T;
+                    }
+                },
+                quote! {},
+                // derive_delegate
+                $derive_delegate_args,
+                $derive_delegate_input,
+                $derive_delegate_expected,
+            }
+        };
+    }
+
     test_register_derive_delegate! {
         test_enum,
         // register
@@ -794,18 +821,8 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_as_ref! {
         test_generics_enum,
-        // register
-        quote! { AsRef<T> },
-        quote! {
-            pub trait AsRef<T: ?Sized> {
-                /// Converts this type into a shared reference of the (usually inferred) input type.
-                #[stable(feature = "rust1", since = "1.0.0")]
-                fn as_ref(&self) -> &T;
-            }
-        },
-        quote! {},
         // derive_delegate
         quote! { AsRef<str> },
         quote! {
@@ -831,18 +848,8 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_as_ref! {
         test_generics_struct,
-        // register
-        quote! { AsRef<T> },
-        quote! {
-            pub trait AsRef<T: ?Sized> {
-                /// Converts this type into a shared reference of the (usually inferred) input type.
-                #[stable(feature = "rust1", since = "1.0.0")]
-                fn as_ref(&self) -> &T;
-            }
-        },
-        quote! {},
         // derive_delegate
         quote! { AsRef<str> },
         quote! {
@@ -863,18 +870,8 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_as_ref! {
         test_generics_specilize_array_of_u8,
-        // register
-        quote! { AsRef<T> },
-        quote! {
-            pub trait AsRef<T: ?Sized> {
-                /// Converts this type into a shared reference of the (usually inferred) input type.
-                #[stable(feature = "rust1", since = "1.0.0")]
-                fn as_ref(&self) -> &T;
-            }
-        },
-        quote! {},
         // derive_delegate
         quote! { AsRef<[u8]> },
         quote! {
@@ -891,18 +888,8 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_as_ref! {
         test_generics_specilize_complex,
-        // register
-        quote! { AsRef<T> },
-        quote! {
-            pub trait AsRef<T: ?Sized> {
-                /// Converts this type into a shared reference of the (usually inferred) input type.
-                #[stable(feature = "rust1", since = "1.0.0")]
-                fn as_ref(&self) -> &T;
-            }
-        },
-        quote! {},
         // derive_delegate
         quote! { AsRef<(dyn Fn(usize) -> usize + 'static)> },
         quote! {
