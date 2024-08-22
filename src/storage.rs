@@ -4,11 +4,26 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-struct PathAsString(String);
+struct Key(String);
+
+impl Key {
+    fn new(path: &syn::Path) -> Self {
+        let mut path = path.clone();
+        path.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
+
+        Self(path.to_token_stream().to_string())
+    }
+}
+
+impl From<&syn::Path> for Key {
+    fn from(path: &syn::Path) -> Self {
+        Key::new(path)
+    }
+}
 
 /// Store information that in necessary to pass from `register()` to `derive_delegate()`.
 pub(crate) struct Storage {
-    path_to_ingredients: Arc<Mutex<HashMap<PathAsString, Vec<StorableFnIngredient>>>>,
+    path_to_ingredients: Arc<Mutex<HashMap<Key, Vec<StorableFnIngredient>>>>,
 }
 
 impl core::fmt::Debug for Storage {
@@ -19,7 +34,7 @@ impl core::fmt::Debug for Storage {
 }
 
 #[allow(clippy::type_complexity)]
-static STORAGE: LazyLock<Arc<Mutex<HashMap<PathAsString, Vec<StorableFnIngredient>>>>> =
+static STORAGE: LazyLock<Arc<Mutex<HashMap<Key, Vec<StorableFnIngredient>>>>> =
     LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 impl Storage {
@@ -31,7 +46,7 @@ impl Storage {
     }
 
     pub fn store(&mut self, path: &syn::Path, fn_ingredients: &[FnIngredient]) -> syn::Result<()> {
-        let key = PathAsString(path.to_token_stream().to_string());
+        let key = path.into();
         let mut map = self.path_to_ingredients.lock().unwrap();
 
         if map.contains_key(&key) {
@@ -51,7 +66,7 @@ impl Storage {
     }
 
     pub fn get(&mut self, path: &syn::Path) -> Option<Vec<FnIngredient>> {
-        let key = PathAsString(path.to_token_stream().to_string());
+        let key = path.into();
         let map = self.path_to_ingredients.lock().unwrap();
         let fn_ingredients = map.get(&key)?.iter().map(|x| x.into()).collect();
         Some(fn_ingredients)
@@ -63,7 +78,7 @@ mod test_storage {
     use super::*;
 
     pub(crate) struct TestStorageFactory {
-        path_to_ingredients: Arc<Mutex<HashMap<PathAsString, Vec<StorableFnIngredient>>>>,
+        path_to_ingredients: Arc<Mutex<HashMap<Key, Vec<StorableFnIngredient>>>>,
     }
 
     impl TestStorageFactory {

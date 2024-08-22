@@ -1,6 +1,8 @@
+mod generic_param_replacer;
 mod punctuated_parser;
 mod storage;
 
+use crate::generic_param_replacer::GenericParamReplacer;
 use crate::punctuated_parser::PunctuatedParser;
 use crate::storage::Storage;
 use indoc::indoc;
@@ -49,6 +51,12 @@ impl FnIngredient {
         self.receiver_prefix()?;
 
         Ok(())
+    }
+
+    pub fn trait_name_without_generic_param(&self) -> syn::Path {
+        let mut trait_name = self.trait_name.clone();
+        trait_name.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
+        trait_name
     }
 
     pub fn receiver_prefix(&self) -> syn::Result<TokenStream> {
@@ -215,9 +223,16 @@ fn derive_delegate_aux_1(
         ));
     };
 
+    if fn_ingredients.is_empty() {
+        return Ok(quote! {});
+    }
+
+    let generic_param_replacer =
+        GenericParamReplacer::new(&fn_ingredients.first().unwrap().trait_name, path)?;
+
     let funcs = fn_ingredients
         .iter()
-        .map(|fn_ingredient| gen_impl_fn(item, fn_ingredient))
+        .map(|fn_ingredient| gen_impl_fn(&generic_param_replacer, item, fn_ingredient))
         .collect::<syn::Result<Vec<_>>>()?;
 
     let item_ident = match item {
@@ -238,10 +253,16 @@ fn derive_delegate_aux_1(
     })
 }
 
-fn gen_impl_fn(item: &syn::Item, fn_ingredient: &FnIngredient) -> syn::Result<TokenStream> {
+fn gen_impl_fn(
+    generic_param_replacer: &GenericParamReplacer,
+    item: &syn::Item,
+    fn_ingredient: &FnIngredient,
+) -> syn::Result<TokenStream> {
     match item {
-        syn::Item::Enum(enum_) => gen_impl_fn_enum(enum_, fn_ingredient),
-        syn::Item::Struct(struct_) => gen_impl_fn_struct(struct_, fn_ingredient),
+        syn::Item::Enum(enum_) => gen_impl_fn_enum(generic_param_replacer, enum_, fn_ingredient),
+        syn::Item::Struct(struct_) => {
+            gen_impl_fn_struct(generic_param_replacer, struct_, fn_ingredient)
+        }
         _ => Err(syn::Error::new(
             item.span(),
             "expected `enum ...` or `struct ...`",
@@ -250,10 +271,11 @@ fn gen_impl_fn(item: &syn::Item, fn_ingredient: &FnIngredient) -> syn::Result<To
 }
 
 fn gen_impl_fn_enum(
+    generic_param_replacer: &GenericParamReplacer,
     enum_: &syn::ItemEnum,
     fn_ingredient: &FnIngredient,
 ) -> syn::Result<TokenStream> {
-    let trait_name = &fn_ingredient.trait_name;
+    let trait_name = fn_ingredient.trait_name_without_generic_param();
     let method_ident = &fn_ingredient.ident;
     let args = fn_ingredient.args();
     let match_arms = enum_
@@ -281,7 +303,7 @@ fn gen_impl_fn_enum(
         })
         .collect_vec();
 
-    let sig = &fn_ingredient.sig;
+    let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
     Ok(quote! {
         #sig {
             match self {
@@ -292,6 +314,7 @@ fn gen_impl_fn_enum(
 }
 
 fn gen_impl_fn_struct(
+    generic_param_replacer: &GenericParamReplacer,
     struct_: &syn::ItemStruct,
     fn_ingredient: &FnIngredient,
 ) -> syn::Result<TokenStream> {
@@ -311,8 +334,8 @@ fn gen_impl_fn_struct(
     let receiver_prefix = fn_ingredient.receiver_prefix().unwrap();
     let receiver = quote! { #receiver_prefix self.#field_ident };
 
-    let sig = &fn_ingredient.sig;
-    let trait_name = &fn_ingredient.trait_name;
+    let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
+    let trait_name = fn_ingredient.trait_name_without_generic_param();
     let method_ident = &fn_ingredient.ident;
     let args = fn_ingredient.args();
     Ok(quote! {
@@ -762,6 +785,75 @@ mod tests {
                         Self::A(x) => Hello::hello(x),
                         Self::B(x) => Hello::hello(x),
                     }
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_generics_enum,
+        // register
+        quote! { AsRef<T> },
+        quote! {
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { AsRef<str> },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl AsRef<str> for Hoge {
+                fn as_ref(&self) -> &str {
+                    match self {
+                        Self::A(x) => AsRef::as_ref(x),
+                        Self::B(x) => AsRef::as_ref(x),
+                    }
+                }
+            }
+        }
+    }
+
+    test_register_derive_delegate! {
+        test_generics_struct,
+        // register
+        quote! { AsRef<T> },
+        quote! {
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { AsRef<str> },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+        },
+        quote! {
+            struct Hoge {
+                s: String,
+            }
+
+            impl AsRef<str> for Hoge {
+                fn as_ref(&self) -> &str {
+                    AsRef::as_ref(&self.s)
                 }
             }
         }
