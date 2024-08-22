@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use syn::visit_mut::VisitMut;
 
 pub(crate) struct GenericParamReplacer {
-    replace_by: HashMap<syn::TypePath, syn::Type>,
+    lifetimes: HashMap<syn::Lifetime, syn::Lifetime>,
+    types: HashMap<syn::TypePath, syn::Type>,
 }
 
 impl GenericParamReplacer {
@@ -18,14 +19,17 @@ impl GenericParamReplacer {
             panic!("precondition. it's ensured as orig comes from storage.");
         }
 
+        let mut this = Self {
+            lifetimes: HashMap::new(),
+            types: HashMap::new(),
+        };
+
         let (orig, subst) = match (
             &orig.segments.last().unwrap().arguments,
             &subst.segments.last().unwrap().arguments,
         ) {
             (syn::PathArguments::None, syn::PathArguments::None) => {
-                return Ok(Self {
-                    replace_by: HashMap::new(),
-                });
+                return Ok(this);
             }
             (syn::PathArguments::None, _) | (_, syn::PathArguments::None) => {
                 return Err(syn::Error::new_spanned(
@@ -64,14 +68,19 @@ impl GenericParamReplacer {
             ));
         }
 
-        let mut replace_by = HashMap::new();
         for (o, s) in izip!(orig.args.iter(), subst.args.iter()) {
             match o {
+                syn::GenericArgument::Lifetime(o) => {
+                    let syn::GenericArgument::Lifetime(s) = s else {
+                        todo!();
+                    };
+                    this.lifetimes.insert(o.clone(), s.clone());
+                }
                 syn::GenericArgument::Type(syn::Type::Path(o)) => {
                     let syn::GenericArgument::Type(s) = s else {
                         todo!();
                     };
-                    replace_by.insert(o.clone(), s.clone());
+                    this.types.insert(o.clone(), s.clone());
                 }
                 _ => {
                     todo!();
@@ -79,23 +88,25 @@ impl GenericParamReplacer {
             }
         }
 
-        Ok(Self { replace_by })
+        Ok(this)
     }
 
     pub fn replace_signature(&self, mut sig: syn::Signature) -> syn::Signature {
-        let mut visitor = Visitor {
-            replace_by: &self.replace_by,
-        };
+        let mut visitor = Visitor(self);
         visitor.visit_signature_mut(&mut sig);
         sig
     }
 }
 
-struct Visitor<'a> {
-    replace_by: &'a HashMap<syn::TypePath, syn::Type>,
-}
+struct Visitor<'a>(&'a GenericParamReplacer);
 
 impl VisitMut for Visitor<'_> {
+    fn visit_lifetime_mut(&mut self, node: &mut syn::Lifetime) {
+        if let Some(subst) = self.0.lifetimes.get(node) {
+            *node = subst.clone();
+        }
+    }
+
     // Use `visit_type_mut()` as we need to change enum variant when it matches.
     fn visit_type_mut(&mut self, node: &mut syn::Type) {
         match node {
@@ -124,7 +135,7 @@ impl VisitMut for Visitor<'_> {
                 self.visit_type_paren_mut(x);
             }
             syn::Type::Path(x) => {
-                if let Some(subst) = self.replace_by.get(x) {
+                if let Some(subst) = self.0.types.get(x) {
                     *node = subst.clone();
                 }
             }

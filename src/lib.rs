@@ -235,9 +235,17 @@ fn derive_delegate_aux_1(
         .map(|fn_ingredient| gen_impl_fn(&generic_param_replacer, item, fn_ingredient))
         .collect::<syn::Result<Vec<_>>>()?;
 
-    let item_ident = match item {
-        syn::Item::Enum(enum_) => &enum_.ident,
-        syn::Item::Struct(struct_) => &struct_.ident,
+    let item_name = match item {
+        syn::Item::Enum(enum_) => {
+            let ident = &enum_.ident;
+            let generics = &enum_.generics;
+            quote! { #ident #generics }
+        }
+        syn::Item::Struct(struct_) => {
+            let ident = &struct_.ident;
+            let generics = &struct_.generics;
+            quote! { #ident #generics }
+        }
         _ => {
             return Err(syn::Error::new(
                 item.span(),
@@ -247,7 +255,7 @@ fn derive_delegate_aux_1(
     };
 
     Ok(quote! {
-        impl #path for #item_ident {
+        impl #path for #item_name {
             #(#funcs)*
         }
     })
@@ -901,6 +909,32 @@ mod tests {
             impl AsRef<(dyn Fn(usize) -> usize + 'static)> for Hoge {
                 fn as_ref(&self) -> &(dyn Fn(usize) -> usize + 'static) {
                     AsRef::as_ref(&self.0)
+                }
+            }
+        },
+    }
+
+    test_register_derive_delegate! {
+        test_generics_specilize_lifetime,
+        // register
+        quote! { Hello<'a, T> },
+        quote! {
+            pub trait Hello<'a, T> {
+                fn hello(&self) -> &'a T;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello<'p, str> },
+        quote! {
+            struct Hoge<'p>(&'p str);
+        },
+        quote! {
+            struct Hoge<'p>(&'p str);
+
+            impl Hello<'p, str> for Hoge<'p> {
+                fn hello(&self) -> &'p str {
+                    Hello::hello(&self.0)
                 }
             }
         },
