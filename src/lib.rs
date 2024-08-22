@@ -361,13 +361,15 @@ mod tests {
     }
 
     macro_rules! test_register_derive_delegate {
-        ($test_name:ident,
-         $register_args:expr,
-         $register_input:expr,
-         $register_expected:expr,
-         $derive_delegate_args:expr,
-         $derive_delegate_input:expr,
-         $derive_delegate_expected:expr) => {
+        (
+            $test_name:ident,
+            $register_args:expr,
+            $register_input:expr,
+            $register_expected:expr,
+            $derive_delegate_args:expr,
+            $derive_delegate_input:expr,
+            $derive_delegate_expected:expr,
+        ) => {
             #[test]
             fn $test_name() -> Result<(), syn::Error> {
                 let mut factory = TestStorageFactory::new();
@@ -393,16 +395,18 @@ mod tests {
     }
 
     macro_rules! test_register_register_derive_delegate {
-        ($test_name:ident,
-         $register1_args:expr,
-         $register1_input:expr,
-         $register1_expected:expr,
-         $register2_args:expr,
-         $register2_input:expr,
-         $register2_expected:expr,
-         $derive_delegate_args:expr,
-         $derive_delegate_input:expr,
-         $derive_delegate_expected:expr) => {
+        (
+            $test_name:ident,
+            $register1_args:expr,
+            $register1_input:expr,
+            $register1_expected:expr,
+            $register2_args:expr,
+            $register2_input:expr,
+            $register2_expected:expr,
+            $derive_delegate_args:expr,
+            $derive_delegate_input:expr,
+            $derive_delegate_expected:expr,
+        ) => {
             #[test]
             fn $test_name() -> Result<(), syn::Error> {
                 let mut factory = TestStorageFactory::new();
@@ -466,7 +470,7 @@ mod tests {
                     }
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -501,7 +505,7 @@ mod tests {
                     }
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -536,7 +540,7 @@ mod tests {
                     }
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -566,7 +570,7 @@ mod tests {
                     Hello::hello(&self.s)
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -592,7 +596,7 @@ mod tests {
                     Hello::hello(&self.0)
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -622,7 +626,7 @@ mod tests {
                     Hello::hello(&mut self.s)
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -652,7 +656,7 @@ mod tests {
                     Hello::hello(self.s)
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -687,7 +691,7 @@ mod tests {
                     }
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -722,7 +726,7 @@ mod tests {
                     }
                 }
             }
-        }
+        },
     }
 
     test_register_register_derive_delegate! {
@@ -787,7 +791,7 @@ mod tests {
                     }
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -824,7 +828,7 @@ mod tests {
                     }
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -856,7 +860,7 @@ mod tests {
                     AsRef::as_ref(&self.s)
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -884,7 +888,7 @@ mod tests {
                     AsRef::as_ref(&self.0)
                 }
             }
-        }
+        },
     }
 
     test_register_derive_delegate! {
@@ -912,6 +916,6 @@ mod tests {
                     AsRef::as_ref(&self.0)
                 }
             }
-        }
+        },
     }
 }
