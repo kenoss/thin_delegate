@@ -886,4 +886,32 @@ mod tests {
             }
         }
     }
+
+    test_register_derive_delegate! {
+        test_generics_specilize_complex,
+        // register
+        quote! { AsRef<T> },
+        quote! {
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { AsRef<(dyn Fn(usize) -> usize + 'static)> },
+        quote! {
+            struct Hoge(Box<dyn Fn(usize) -> usize>);
+        },
+        quote! {
+            struct Hoge(Box<dyn Fn(usize) -> usize>);
+
+            impl AsRef<(dyn Fn(usize) -> usize + 'static)> for Hoge {
+                fn as_ref(&self) -> &(dyn Fn(usize) -> usize + 'static) {
+                    AsRef::as_ref(&self.0)
+                }
+            }
+        }
+    }
 }
