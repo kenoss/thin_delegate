@@ -158,7 +158,11 @@ impl VisitMut for Visitor<'_> {
                 // nop
             }
             _ => {
-                unimplemented!("`syn::Type` is `non_exhaustive`. Allow compile and raise an error for new arms. Please file a bug when new ones are added.");
+                unimplemented!(
+                    "`syn::Type` is `non_exhaustive`. \
+                     Allow compile and raise an error for new arms. \
+                     Please file a bug when new ones are added."
+                );
             }
         }
     }
