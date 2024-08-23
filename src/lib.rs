@@ -1,6 +1,7 @@
 mod generic_param_replacer;
 mod punctuated_parser;
 mod storage;
+mod util;
 
 use crate::generic_param_replacer::GenericParamReplacer;
 use crate::punctuated_parser::PunctuatedParser;
@@ -77,12 +78,6 @@ impl<'a> FnIngredient<'a> {
         self.receiver_prefix()?;
 
         Ok(())
-    }
-
-    pub fn trait_path_without_generic_param(&self) -> syn::Path {
-        let mut trait_path = self.trait_path.clone();
-        trait_path.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
-        trait_path
     }
 
     pub fn receiver_prefix(&self) -> syn::Result<TokenStream> {
@@ -304,7 +299,7 @@ fn gen_impl_fn_enum(
     enum_: &syn::ItemEnum,
     fn_ingredient: FnIngredient<'_>,
 ) -> syn::Result<TokenStream> {
-    let trait_path = fn_ingredient.trait_path_without_generic_param();
+    let trait_path = util::trim_generic_param(fn_ingredient.trait_path);
     let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
     let match_arms = enum_
@@ -364,7 +359,7 @@ fn gen_impl_fn_struct(
     let receiver = quote! { #receiver_prefix self.#field_ident };
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
-    let trait_path = fn_ingredient.trait_path_without_generic_param();
+    let trait_path = util::trim_generic_param(fn_ingredient.trait_path);
     let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
     Ok(quote! {

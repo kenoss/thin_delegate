@@ -1,3 +1,4 @@
+use crate::util;
 use indoc::indoc;
 use itertools::izip;
 use quote::ToTokens;
@@ -11,11 +12,7 @@ pub(crate) struct GenericParamReplacer {
 
 impl GenericParamReplacer {
     pub fn new(orig: &syn::Path, subst: &syn::Path) -> syn::Result<Self> {
-        let mut orig_ = orig.clone();
-        orig_.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
-        let mut subst_ = orig.clone();
-        subst_.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
-        if orig_ != subst_ {
+        if util::trim_generic_param(orig) != util::trim_generic_param(subst) {
             panic!("precondition. it's ensured as orig comes from storage.");
         }
 
