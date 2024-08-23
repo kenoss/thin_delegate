@@ -137,6 +137,8 @@ impl VisitMut for Visitor<'_> {
             syn::Type::Path(x) => {
                 if let Some(subst) = self.0.types.get(x) {
                     *node = subst.clone();
+                } else {
+                    self.visit_type_path_mut(x);
                 }
             }
             syn::Type::Ptr(x) => {

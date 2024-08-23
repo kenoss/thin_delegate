@@ -896,6 +896,35 @@ mod tests {
         },
     }
 
+    test_register_derive_delegate! {
+        test_specialize_param_in_path,
+        // register
+        quote! { Hello<T> },
+        quote! {
+            pub trait Hello<T>
+            where
+                T: ToString,
+            {
+                fn hello(&self, x: &Vec<T>) -> String;
+            }
+        },
+        quote! {},
+        // derive_delegate
+        quote! { Hello<&str> },
+        quote! {
+            struct Hoge(String);
+        },
+        quote! {
+            struct Hoge(String);
+
+            impl Hello<&str> for Hoge {
+                fn hello(&self, x: &Vec<&str>) -> String {
+                    Hello::hello(&self.0, x)
+                }
+            }
+        },
+    }
+
     test_as_ref! {
         test_generics_specilize_complex,
         // derive_delegate
