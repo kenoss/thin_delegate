@@ -169,3 +169,68 @@ impl VisitMut for Visitor<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::quote;
+
+    macro_rules! test_replace_signature {
+        (
+            $test_name:ident,
+            $orig:expr,
+            $func:expr,
+            $subst:expr,
+            $func_replaced_expected:expr,
+        ) => {
+            #[test]
+            fn $test_name() -> Result<(), syn::Error> {
+                let orig = syn::parse2::<syn::Path>($orig).unwrap();
+                let subst = syn::parse2::<syn::Path>($subst).unwrap();
+                let func = syn::parse2::<syn::TraitItemFn>($func).unwrap();
+                let func_replaced_expected =
+                    syn::parse2::<syn::TraitItemFn>($func_replaced_expected).unwrap();
+
+                let generic_param_replacer = GenericParamReplacer::new(&orig, &subst)?;
+                assert_eq!(
+                    generic_param_replacer.replace_signature(func.sig.clone()),
+                    func_replaced_expected.sig
+                );
+
+                Ok(())
+            }
+        };
+    }
+
+    test_replace_signature! {
+        type_path,
+        quote! { AsRef<T> },
+        quote! { fn as_ref(&self) -> &T; },
+        quote! { AsRef<str> },
+        quote! { fn as_ref(&self) -> &str; },
+    }
+
+    test_replace_signature! {
+        type_path_type,
+        quote! { Hello<T> },
+        quote! { fn hello(&self, x: &Vec<T>) -> String; },
+        quote! { Hello<&str> },
+        quote! { fn hello(&self, x: &Vec<&str>) -> String; },
+    }
+
+    test_replace_signature! {
+        type_array_type,
+        quote! { AsRef<T> },
+        quote! { fn as_ref(&self) -> &T; },
+        quote! { AsRef<[u8]> },
+        quote! { fn as_ref(&self) -> &[u8]; },
+    }
+
+    test_replace_signature! {
+        lifetime,
+        quote! { Hello<'a, T> },
+        quote! { fn hello(&self) -> &'a T; },
+        quote! { Hello<'p, str> },
+        quote! { fn hello(&self) -> &'p str; },
+    }
+}

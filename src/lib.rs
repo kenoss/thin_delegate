@@ -879,53 +879,6 @@ mod tests {
     }
 
     test_as_ref! {
-        test_generics_specilize_array_of_u8,
-        // derive_delegate
-        quote! { AsRef<[u8]> },
-        quote! {
-            struct Hoge(String);
-        },
-        quote! {
-            struct Hoge(String);
-
-            impl AsRef<[u8]> for Hoge {
-                fn as_ref(&self) -> &[u8] {
-                    AsRef::as_ref(&self.0)
-                }
-            }
-        },
-    }
-
-    test_register_derive_delegate! {
-        test_specialize_param_in_path,
-        // register
-        quote! { Hello<T> },
-        quote! {
-            pub trait Hello<T>
-            where
-                T: ToString,
-            {
-                fn hello(&self, x: &Vec<T>) -> String;
-            }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello<&str> },
-        quote! {
-            struct Hoge(String);
-        },
-        quote! {
-            struct Hoge(String);
-
-            impl Hello<&str> for Hoge {
-                fn hello(&self, x: &Vec<&str>) -> String {
-                    Hello::hello(&self.0, x)
-                }
-            }
-        },
-    }
-
-    test_as_ref! {
         test_generics_specilize_complex,
         // derive_delegate
         quote! { AsRef<(dyn Fn(usize) -> usize + 'static)> },
