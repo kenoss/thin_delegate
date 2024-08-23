@@ -167,17 +167,25 @@ mod tests {
     test_replace_signature! {
         type_path_type,
         quote! { Hello<T> },
-        quote! { fn hello(&self, x: &Vec<T>) -> String; },
+        quote! { fn hello(&self) -> Vec<T>; },
         quote! { Hello<&str> },
-        quote! { fn hello(&self, x: &Vec<&str>) -> String; },
+        quote! { fn hello(&self) -> Vec<&str>; },
+    }
+
+    test_replace_signature! {
+        type_array_type,
+        quote! { Hello<T> },
+        quote! { fn hello(&self) -> [T; 4]; },
+        quote! { Hello<u8> },
+        quote! { fn hello(&self) -> [u8; 4]; },
     }
 
     test_replace_signature! {
         type_slice_type,
-        quote! { AsRef<T> },
-        quote! { fn as_ref(&self) -> &T; },
-        quote! { AsRef<[u8]> },
-        quote! { fn as_ref(&self) -> &[u8]; },
+        quote! { Hello<T> },
+        quote! { fn hello(&self) -> &[T]; },
+        quote! { Hello<u8> },
+        quote! { fn hello(&self) -> &[u8]; },
     }
 
     test_replace_signature! {
