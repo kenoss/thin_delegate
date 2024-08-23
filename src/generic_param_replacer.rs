@@ -109,64 +109,18 @@ impl VisitMut for Visitor<'_> {
 
     // Use `visit_type_mut()` as we need to change enum variant when it matches.
     fn visit_type_mut(&mut self, node: &mut syn::Type) {
+        #[allow(clippy::single_match)]
         match node {
-            syn::Type::Array(x) => {
-                self.visit_type_array_mut(x);
-            }
-            syn::Type::BareFn(x) => {
-                self.visit_type_bare_fn_mut(x);
-            }
-            syn::Type::Group(x) => {
-                self.visit_type_group_mut(x);
-            }
-            syn::Type::ImplTrait(x) => {
-                self.visit_type_impl_trait_mut(x);
-            }
-            syn::Type::Infer(x) => {
-                self.visit_type_infer_mut(x);
-            }
-            syn::Type::Macro(x) => {
-                self.visit_type_macro_mut(x);
-            }
-            syn::Type::Never(x) => {
-                self.visit_type_never_mut(x);
-            }
-            syn::Type::Paren(x) => {
-                self.visit_type_paren_mut(x);
-            }
             syn::Type::Path(x) => {
                 if let Some(subst) = self.0.types.get(x) {
                     *node = subst.clone();
-                } else {
-                    self.visit_type_path_mut(x);
+                    return;
                 }
             }
-            syn::Type::Ptr(x) => {
-                self.visit_type_ptr_mut(x);
-            }
-            syn::Type::Reference(x) => {
-                self.visit_type_reference_mut(x);
-            }
-            syn::Type::Slice(x) => {
-                self.visit_type_slice_mut(x);
-            }
-            syn::Type::TraitObject(x) => {
-                self.visit_type_trait_object_mut(x);
-            }
-            syn::Type::Tuple(x) => {
-                self.visit_type_tuple_mut(x);
-            }
-            syn::Type::Verbatim(_x) => {
-                // nop
-            }
-            _ => {
-                unimplemented!(
-                    "`syn::Type` is `non_exhaustive`. \
-                     Allow compile and raise an error for new arms. \
-                     Please file a bug when new ones are added."
-                );
-            }
+            _ => {}
         }
+
+        syn::visit_mut::visit_type_mut(self, node);
     }
 }
 
