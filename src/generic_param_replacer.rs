@@ -173,7 +173,7 @@ mod tests {
     }
 
     test_replace_signature! {
-        type_array_type,
+        type_slice_type,
         quote! { AsRef<T> },
         quote! { fn as_ref(&self) -> &T; },
         quote! { AsRef<[u8]> },
