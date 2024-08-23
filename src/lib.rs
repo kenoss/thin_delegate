@@ -474,7 +474,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_enum,
+        r#enum,
         // register
         quote! { Hello },
         quote! {
@@ -509,7 +509,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_enum_ref_mut_receiver,
+        enum_ref_mut_receiver,
         // register
         quote! { Hello },
         quote! {
@@ -544,7 +544,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_enum_consume_receiver,
+        enum_consume_receiver,
         // register
         quote! { Hello },
         quote! {
@@ -579,7 +579,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_struct_with_named_field,
+        struct_with_named_field,
         // register
         quote! { Hello },
         quote! {
@@ -609,7 +609,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_struct_with_unnamed_field,
+        struct_with_unnamed_field,
         // register
         quote! { Hello },
         quote! {
@@ -635,7 +635,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_struct_ref_mut_receiver,
+        struct_ref_mut_receiver,
         // register
         quote! { Hello },
         quote! {
@@ -665,7 +665,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_struct_consume_receiver,
+        struct_consume_receiver,
         // register
         quote! { Hello },
         quote! {
@@ -695,7 +695,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_method_with_args,
+        method_with_args,
         // register
         quote! { Hello },
         quote! {
@@ -730,7 +730,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_super_crate,
+        super_crate,
         // register
         quote! { Hello },
         quote! {
@@ -765,7 +765,7 @@ mod tests {
     }
 
     test_register_register_derive_delegate! {
-        test_multiple_derive,
+        multiple_derive,
         // register
         quote! { ToString },
         quote! {
@@ -830,7 +830,7 @@ mod tests {
     }
 
     test_as_ref! {
-        test_generics_enum,
+        generics_enum,
         // derive_delegate
         quote! { AsRef<str> },
         quote! {
@@ -857,7 +857,7 @@ mod tests {
     }
 
     test_as_ref! {
-        test_generics_struct,
+        generics_struct,
         // derive_delegate
         quote! { AsRef<str> },
         quote! {
@@ -879,7 +879,7 @@ mod tests {
     }
 
     test_as_ref! {
-        test_generics_specilize_complex,
+        generics_specilize_complex,
         // derive_delegate
         quote! { AsRef<(dyn Fn(usize) -> usize + 'static)> },
         quote! {
@@ -897,7 +897,7 @@ mod tests {
     }
 
     test_register_derive_delegate! {
-        test_generics_specilize_lifetime,
+        generics_specilize_lifetime,
         // register
         quote! { Hello<'a, T> },
         quote! {
