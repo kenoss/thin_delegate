@@ -16,6 +16,7 @@ use syn::spanned::Spanned;
 #[derive(Debug)]
 pub(crate) struct TraitData {
     trait_path: syn::Path,
+    generics: syn::Generics,
     sigs: Vec<syn::Signature>,
 }
 
@@ -27,6 +28,7 @@ struct FnIngredient<'a> {
 #[derive(Debug)]
 pub(crate) struct StorableTraitData {
     trait_path: String,
+    generics: String,
     sigs: Vec<String>,
 }
 
@@ -34,6 +36,7 @@ impl From<&TraitData> for StorableTraitData {
     fn from(x: &TraitData) -> Self {
         Self {
             trait_path: x.trait_path.to_token_stream().to_string(),
+            generics: x.generics.to_token_stream().to_string(),
             sigs: x
                 .sigs
                 .iter()
@@ -47,6 +50,7 @@ impl From<&StorableTraitData> for TraitData {
     fn from(x: &StorableTraitData) -> Self {
         Self {
             trait_path: syn::parse2::<syn::Path>(x.trait_path.parse().unwrap()).unwrap(),
+            generics: syn::parse2::<syn::Generics>(x.generics.parse().unwrap()).unwrap(),
             sigs: x
                 .sigs
                 .iter()
@@ -171,6 +175,7 @@ fn register_aux(
         .collect_vec();
     let trait_data = TraitData {
         trait_path: path.clone(),
+        generics: trait_.generics.clone(),
         sigs,
     };
     trait_data.validate()?;
@@ -244,7 +249,10 @@ fn derive_delegate_aux_1(
         return Ok(quote! {});
     }
 
-    let generic_param_replacer = GenericParamReplacer::new(&trait_data.trait_path, path)?;
+    let generic_param_replacer = GenericParamReplacer::new(
+        &trait_data.generics,
+        &path.segments.last().unwrap().arguments,
+    )?;
 
     let funcs = trait_data
         .fn_ingredients()
