@@ -13,50 +13,76 @@ use syn::parse_macro_input;
 use syn::spanned::Spanned;
 
 #[derive(Debug)]
-pub(crate) struct FnIngredient {
-    trait_name: syn::Path,
-    ident: syn::Ident,
-    sig: syn::Signature,
+pub(crate) struct TraitData {
+    trait_path: syn::Path,
+    sigs: Vec<syn::Signature>,
+}
+
+struct FnIngredient<'a> {
+    trait_path: &'a syn::Path,
+    sig: &'a syn::Signature,
 }
 
 #[derive(Debug)]
-pub(crate) struct StorableFnIngredient {
-    trait_name: String,
-    ident: String,
-    sig: String,
+pub(crate) struct StorableTraitData {
+    trait_path: String,
+    sigs: Vec<String>,
 }
 
-impl From<&FnIngredient> for StorableFnIngredient {
-    fn from(x: &FnIngredient) -> Self {
+impl From<&TraitData> for StorableTraitData {
+    fn from(x: &TraitData) -> Self {
         Self {
-            trait_name: x.trait_name.to_token_stream().to_string(),
-            ident: x.ident.to_token_stream().to_string(),
-            sig: x.sig.to_token_stream().to_string(),
+            trait_path: x.trait_path.to_token_stream().to_string(),
+            sigs: x
+                .sigs
+                .iter()
+                .map(|sig| sig.to_token_stream().to_string())
+                .collect(),
         }
     }
 }
 
-impl From<&StorableFnIngredient> for FnIngredient {
-    fn from(x: &StorableFnIngredient) -> Self {
+impl From<&StorableTraitData> for TraitData {
+    fn from(x: &StorableTraitData) -> Self {
         Self {
-            trait_name: syn::parse2::<syn::Path>(x.trait_name.parse().unwrap()).unwrap(),
-            ident: syn::parse2::<syn::Ident>(x.ident.parse().unwrap()).unwrap(),
-            sig: syn::parse2::<syn::Signature>(x.sig.parse().unwrap()).unwrap(),
+            trait_path: syn::parse2::<syn::Path>(x.trait_path.parse().unwrap()).unwrap(),
+            sigs: x
+                .sigs
+                .iter()
+                .map(|sig| syn::parse2::<syn::Signature>(sig.parse().unwrap()).unwrap())
+                .collect(),
         }
     }
 }
 
-impl FnIngredient {
+impl TraitData {
+    fn fn_ingredients(&self) -> impl Iterator<Item = FnIngredient<'_>> {
+        self.sigs.iter().map(|sig| FnIngredient {
+            trait_path: &self.trait_path,
+            sig,
+        })
+    }
+
+    fn validate(&self) -> syn::Result<()> {
+        for fn_ingredient in self.fn_ingredients() {
+            fn_ingredient.validate()?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> FnIngredient<'a> {
     pub fn validate(&self) -> syn::Result<()> {
         self.receiver_prefix()?;
 
         Ok(())
     }
 
-    pub fn trait_name_without_generic_param(&self) -> syn::Path {
-        let mut trait_name = self.trait_name.clone();
-        trait_name.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
-        trait_name
+    pub fn trait_path_without_generic_param(&self) -> syn::Path {
+        let mut trait_path = self.trait_path.clone();
+        trait_path.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
+        trait_path
     }
 
     pub fn receiver_prefix(&self) -> syn::Result<TokenStream> {
@@ -137,7 +163,7 @@ fn register_aux(
         return Err(syn::Error::new(item.span(), "expected `trait ...`"));
     };
 
-    let fn_ingredients = trait_
+    let sigs = trait_
         .items
         .iter()
         .filter_map(|x| {
@@ -145,20 +171,16 @@ fn register_aux(
                 return None;
             };
 
-            let fn_ingredient = FnIngredient {
-                trait_name: path.clone(),
-                ident: fn_.sig.ident.clone(),
-                sig: fn_.sig.clone(),
-            };
-
-            Some(fn_ingredient)
+            Some(fn_.sig.clone())
         })
         .collect_vec();
-    for fn_ingredient in &fn_ingredients {
-        fn_ingredient.validate()?;
-    }
+    let trait_data = TraitData {
+        trait_path: path.clone(),
+        sigs,
+    };
+    trait_data.validate()?;
 
-    storage.store(&path, &fn_ingredients)?;
+    storage.store(&path, &trait_data)?;
 
     // TODO: Split `register()` and `register_temporarily()` and return tokens for the former.
     Ok(TokenStream::new())
@@ -209,7 +231,7 @@ fn derive_delegate_aux_1(
     item: &syn::Item,
     path: &syn::Path,
 ) -> syn::Result<TokenStream> {
-    let Some(fn_ingredients) = storage.get(path) else {
+    let Some(trait_data) = storage.get(path) else {
         return Err(syn::Error::new(
             Span::call_site(),
             format!(
@@ -223,15 +245,14 @@ fn derive_delegate_aux_1(
         ));
     };
 
-    if fn_ingredients.is_empty() {
+    if trait_data.sigs.is_empty() {
         return Ok(quote! {});
     }
 
-    let generic_param_replacer =
-        GenericParamReplacer::new(&fn_ingredients.first().unwrap().trait_name, path)?;
+    let generic_param_replacer = GenericParamReplacer::new(&trait_data.trait_path, path)?;
 
-    let funcs = fn_ingredients
-        .iter()
+    let funcs = trait_data
+        .fn_ingredients()
         .map(|fn_ingredient| gen_impl_fn(&generic_param_replacer, item, fn_ingredient))
         .collect::<syn::Result<Vec<_>>>()?;
 
@@ -264,7 +285,7 @@ fn derive_delegate_aux_1(
 fn gen_impl_fn(
     generic_param_replacer: &GenericParamReplacer,
     item: &syn::Item,
-    fn_ingredient: &FnIngredient,
+    fn_ingredient: FnIngredient<'_>,
 ) -> syn::Result<TokenStream> {
     match item {
         syn::Item::Enum(enum_) => gen_impl_fn_enum(generic_param_replacer, enum_, fn_ingredient),
@@ -281,10 +302,10 @@ fn gen_impl_fn(
 fn gen_impl_fn_enum(
     generic_param_replacer: &GenericParamReplacer,
     enum_: &syn::ItemEnum,
-    fn_ingredient: &FnIngredient,
+    fn_ingredient: FnIngredient<'_>,
 ) -> syn::Result<TokenStream> {
-    let trait_name = fn_ingredient.trait_name_without_generic_param();
-    let method_ident = &fn_ingredient.ident;
+    let trait_path = fn_ingredient.trait_path_without_generic_param();
+    let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
     let match_arms = enum_
         .variants
@@ -301,7 +322,7 @@ fn gen_impl_fn_enum(
                     }
 
                     quote! {
-                        Self::#variant_ident(x) => #trait_name::#method_ident(x #(,#args)*)
+                        Self::#variant_ident(x) => #trait_path::#method_ident(x #(,#args)*)
                     }
                 }
                 syn::Fields::Unit => {
@@ -324,7 +345,7 @@ fn gen_impl_fn_enum(
 fn gen_impl_fn_struct(
     generic_param_replacer: &GenericParamReplacer,
     struct_: &syn::ItemStruct,
-    fn_ingredient: &FnIngredient,
+    fn_ingredient: FnIngredient<'_>,
 ) -> syn::Result<TokenStream> {
     let field_ident = {
         if struct_.fields.len() != 1 {
@@ -343,12 +364,12 @@ fn gen_impl_fn_struct(
     let receiver = quote! { #receiver_prefix self.#field_ident };
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
-    let trait_name = fn_ingredient.trait_name_without_generic_param();
-    let method_ident = &fn_ingredient.ident;
+    let trait_path = fn_ingredient.trait_path_without_generic_param();
+    let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
     Ok(quote! {
         #sig {
-            #trait_name::#method_ident(#receiver #(,#args)*)
+            #trait_path::#method_ident(#receiver #(,#args)*)
         }
     })
 }

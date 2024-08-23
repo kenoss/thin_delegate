@@ -1,4 +1,4 @@
-use crate::{FnIngredient, StorableFnIngredient};
+use crate::{StorableTraitData, TraitData};
 use quote::ToTokens;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
@@ -23,31 +23,31 @@ impl From<&syn::Path> for Key {
 
 /// Store information that in necessary to pass from `register()` to `derive_delegate()`.
 pub(crate) struct Storage {
-    path_to_ingredients: Arc<Mutex<HashMap<Key, Vec<StorableFnIngredient>>>>,
+    path_to_trait_data: Arc<Mutex<HashMap<Key, StorableTraitData>>>,
 }
 
 impl core::fmt::Debug for Storage {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
-        let map = self.path_to_ingredients.lock().unwrap();
+        let map = self.path_to_trait_data.lock().unwrap();
         map.fmt(f)
     }
 }
 
 #[allow(clippy::type_complexity)]
-static STORAGE: LazyLock<Arc<Mutex<HashMap<Key, Vec<StorableFnIngredient>>>>> =
+static STORAGE: LazyLock<Arc<Mutex<HashMap<Key, StorableTraitData>>>> =
     LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 impl Storage {
     /// Acquire an accessor to compile-time global storage.
     pub fn global() -> Self {
         Self {
-            path_to_ingredients: LazyLock::force(&STORAGE).clone(),
+            path_to_trait_data: LazyLock::force(&STORAGE).clone(),
         }
     }
 
-    pub fn store(&mut self, path: &syn::Path, fn_ingredients: &[FnIngredient]) -> syn::Result<()> {
+    pub fn store(&mut self, path: &syn::Path, trait_data: &TraitData) -> syn::Result<()> {
         let key = path.into();
-        let mut map = self.path_to_ingredients.lock().unwrap();
+        let mut map = self.path_to_trait_data.lock().unwrap();
 
         if map.contains_key(&key) {
             return Err(syn::Error::new_spanned(
@@ -59,17 +59,16 @@ impl Storage {
             ));
         }
 
-        let value = fn_ingredients.iter().map(|x| x.into()).collect();
-        map.insert(key, value);
+        map.insert(key, trait_data.into());
 
         Ok(())
     }
 
-    pub fn get(&mut self, path: &syn::Path) -> Option<Vec<FnIngredient>> {
+    pub fn get(&mut self, path: &syn::Path) -> Option<TraitData> {
         let key = path.into();
-        let map = self.path_to_ingredients.lock().unwrap();
-        let fn_ingredients = map.get(&key)?.iter().map(|x| x.into()).collect();
-        Some(fn_ingredients)
+        let map = self.path_to_trait_data.lock().unwrap();
+        let trait_data = map.get(&key)?.into();
+        Some(trait_data)
     }
 }
 
@@ -78,19 +77,19 @@ mod test_storage {
     use super::*;
 
     pub(crate) struct TestStorageFactory {
-        path_to_ingredients: Arc<Mutex<HashMap<Key, Vec<StorableFnIngredient>>>>,
+        path_to_trait_data: Arc<Mutex<HashMap<Key, StorableTraitData>>>,
     }
 
     impl TestStorageFactory {
         pub fn new() -> Self {
             Self {
-                path_to_ingredients: Arc::new(Mutex::new(HashMap::new())),
+                path_to_trait_data: Arc::new(Mutex::new(HashMap::new())),
             }
         }
 
         pub fn factory(&mut self) -> Storage {
             Storage {
-                path_to_ingredients: self.path_to_ingredients.clone(),
+                path_to_trait_data: self.path_to_trait_data.clone(),
             }
         }
     }
