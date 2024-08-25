@@ -16,7 +16,7 @@ impl<T> Hello<T> for char {
 
 // TODO: Make `register()` is usable for trait definition.
 mod private_for_thin_delegate {
-    #[thin_delegate::register(Hello<T>)]
+    #[thin_delegate::register(Hello)]
     pub trait Hello<T> {
         fn hello(&self) -> String;
     }

@@ -1,7 +1,6 @@
 mod generic_param_replacer;
 mod punctuated_parser;
 mod storage;
-mod util;
 
 use crate::generic_param_replacer::GenericParamReplacer;
 use crate::punctuated_parser::PunctuatedParser;
@@ -147,20 +146,27 @@ fn register_aux(
     if args.is_empty() {
         return Err(syn::Error::new_spanned(
             args,
-            "arguments must not be empty: `#[thin_delegate::register(Type)]`",
+            "arguments must not be empty: `#[thin_delegate::register(<path>, ...)]`",
         ));
     }
 
     let path = syn::parse2::<syn::Path>(args.clone()).map_err(|_| {
         syn::Error::new_spanned(
             args,
-            "type argument expected: `#[thin_delegate::register(Type)]`",
+            "type argument expected: `#[thin_delegate::register(<path>, ...)]`",
         )
     })?;
 
     let syn::Item::Trait(trait_) = item else {
         return Err(syn::Error::new(item.span(), "expected `trait ...`"));
     };
+
+    if path.segments.last().unwrap().arguments != syn::PathArguments::None {
+        return Err(syn::Error::new_spanned(
+            path,
+            "argument must be a path without generic paramteres, like in `use ...`",
+        ));
+    }
 
     let sigs = trait_
         .items
@@ -208,7 +214,7 @@ fn derive_delegate_aux(
     if args.is_empty() {
         return Err(syn::Error::new_spanned(
             args,
-            "arguments must not be empty `#[thin_delegate::derive_delegate(Type)]`",
+            "arguments must not be empty `#[thin_delegate::derive_delegate(<path>, ...)]`",
         ));
     }
 
@@ -307,7 +313,7 @@ fn gen_impl_fn_enum(
     enum_: &syn::ItemEnum,
     fn_ingredient: FnIngredient<'_>,
 ) -> syn::Result<TokenStream> {
-    let trait_path = util::trim_generic_param(fn_ingredient.trait_path);
+    let trait_path = &fn_ingredient.trait_path;
     let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
     let match_arms = enum_
@@ -367,7 +373,7 @@ fn gen_impl_fn_struct(
     let receiver = quote! { #receiver_prefix self.#field_ident };
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
-    let trait_path = util::trim_generic_param(fn_ingredient.trait_path);
+    let trait_path = &fn_ingredient.trait_path;
     let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
     Ok(quote! {
@@ -480,7 +486,7 @@ mod tests {
             test_register_derive_delegate! {
                 $test_name,
                 // register
-                quote! { AsRef<T> },
+                quote! { AsRef },
                 quote! {
                     pub trait AsRef<T: ?Sized> {
                         /// Converts this type into a shared reference of the (usually inferred) input type.
@@ -923,7 +929,7 @@ mod tests {
     test_register_derive_delegate! {
         generics_specilize_lifetime,
         // register
-        quote! { Hello<'a, T> },
+        quote! { Hello },
         quote! {
             pub trait Hello<'a, T> {
                 fn hello(&self) -> &'a T;
