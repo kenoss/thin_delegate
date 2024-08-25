@@ -322,24 +322,41 @@ fn gen_impl_fn_enum(
         .map(|variant| {
             let variant_ident = &variant.ident;
             match &variant.fields {
-                syn::Fields::Named(_) => {
-                    todo!();
+                syn::Fields::Named(fields) => {
+                    if fields.named.len() != 1 {
+                        return Err(syn::Error::new_spanned(
+                            &variant.fields,
+                            "fields of enum variant must be a field",
+                        ));
+                    }
+
+                    let ident = fields.named[0].ident.as_ref().unwrap();
+
+                    Ok(quote! {
+                        Self::#variant_ident { #ident } => #trait_path::#method_ident(#ident #(,#args)*)
+                    })
                 }
                 syn::Fields::Unnamed(fields) => {
                     if fields.unnamed.len() != 1 {
-                        todo!();
+                        return Err(syn::Error::new_spanned(
+                            &variant.fields,
+                            "fields of enum variant must be a field",
+                        ));
                     }
 
-                    quote! {
+                    Ok(quote! {
                         Self::#variant_ident(x) => #trait_path::#method_ident(x #(,#args)*)
-                    }
+                    })
                 }
                 syn::Fields::Unit => {
-                    todo!();
+                    Err(syn::Error::new_spanned(
+                        variant,
+                        "fields of enum variant must be a field",
+                    ))
                 }
             }
         })
-        .collect_vec();
+        .collect::<syn::Result<Vec<_>>>()?;
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
     Ok(quote! {
@@ -517,21 +534,25 @@ mod tests {
         quote! { Hello },
         quote! {
             enum Hoge {
-                A(String),
-                B(char),
+                Named {
+                    named: String,
+                },
+                Unnamed(char),
             }
         },
         quote! {
             enum Hoge {
-                A(String),
-                B(char),
+                Named {
+                    named: String,
+                },
+                Unnamed(char),
             }
 
             impl Hello for Hoge {
                 fn hello(&self) -> String {
                     match self {
-                        Self::A(x) => Hello::hello(x),
-                        Self::B(x) => Hello::hello(x),
+                        Self::Named { named } => Hello::hello(named),
+                        Self::Unnamed(x) => Hello::hello(x),
                     }
                 }
             }

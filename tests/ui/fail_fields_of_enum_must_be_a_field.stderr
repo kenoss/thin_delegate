@@ -1,0 +1,21 @@
+error: fields of enum variant must be a field
+  --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:12:11
+   |
+12 |       Named {
+   |  ___________^
+13 | |         x: String,
+14 | |         y: String,
+15 | |     },
+   | |_____^
+
+error: fields of enum variant must be a field
+  --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:20:12
+   |
+20 |     Unnamed(String, String),
+   |            ^^^^^^^^^^^^^^^^
+
+error: fields of enum variant must be a field
+  --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:25:5
+   |
+25 |     Unit,
+   |     ^^^^
