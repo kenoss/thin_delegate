@@ -66,7 +66,18 @@ impl GenericParamReplacer {
             match o {
                 syn::GenericParam::Lifetime(o) => {
                     let syn::GenericArgument::Lifetime(s) = s else {
-                        todo!();
+                        return Err(syn::Error::new_spanned(
+                            s,
+                            format!(
+                                indoc! {r#"
+                                    parameter can't be substituted to argument:
+                                        in definition of trait         = {orig}
+                                        in definition of derive target = {subst}
+                                "#},
+                                orig = orig.to_token_stream(),
+                                subst = subst.to_token_stream(),
+                            ),
+                        ));
                     };
                     this.lifetimes.insert(o.lifetime.clone(), s.clone());
                 }
