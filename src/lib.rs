@@ -1,7 +1,13 @@
+mod delegate_to_arg;
+#[cfg(not(feature = "unstable_delegate_to"))]
+mod delegate_to_checker;
+mod delegate_to_remover;
 mod generic_param_replacer;
+mod ident_replacer;
 mod punctuated_parser;
 mod storage;
 
+use crate::delegate_to_arg::DelegateToArg;
 use crate::generic_param_replacer::GenericParamReplacer;
 use crate::punctuated_parser::PunctuatedParser;
 use crate::storage::Storage;
@@ -197,19 +203,32 @@ pub fn derive_delegate(
     args: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let item = parse_macro_input!(input as syn::Item);
+    let input_ = input.clone();
+    let item = parse_macro_input!(input_ as syn::Item);
     let mut storage = Storage::global();
 
-    match derive_delegate_aux(&mut storage, args.into(), &item) {
+    #[cfg(not(feature = "unstable_delegate_to"))]
+    {
+        let mut item = item.clone();
+        match delegate_to_checker::check_non_existence(&mut item) {
+            Ok(()) => {}
+            Err(e) => {
+                return TokenStream::from_iter([e.into_compile_error(), input.into()]).into();
+            }
+        }
+    }
+
+    match derive_delegate_aux(&mut storage, args.into(), item) {
         Ok(x) => x.into(),
-        Err(e) => TokenStream::from_iter([e.into_compile_error(), (quote! { #item })]).into(),
+        Err(e) => TokenStream::from_iter([e.into_compile_error(), input.into()]).into(),
     }
 }
 
 fn derive_delegate_aux(
     storage: &mut Storage,
     args: TokenStream,
-    item: &syn::Item,
+    // Mutation is allowed only for removing attributes used, e.g. `#[delegate_to(...)]`.
+    mut item: syn::Item,
 ) -> syn::Result<TokenStream> {
     if args.is_empty() {
         return Err(syn::Error::new_spanned(
@@ -222,8 +241,11 @@ fn derive_delegate_aux(
 
     let impls = paths
         .iter()
-        .map(|path| derive_delegate_aux_1(storage, item, path))
+        .map(|path| derive_delegate_aux_1(storage, &item, path))
         .collect::<syn::Result<Vec<_>>>()?;
+
+    // Remove `#[delegate_to(...)]` here, as all calls of `derive_delegate_aux_1()` require the attributes.
+    delegate_to_remover::remove_delegate_to(&mut item);
 
     Ok(quote! {
         #item
@@ -320,6 +342,24 @@ fn gen_impl_fn_enum(
         .variants
         .iter()
         .map(|variant| {
+            // Note that we'll remove `#[delegate_to(...)]` attribute by `delegate_to_remover::remove_delegate_to()`.
+            let mut delegate_to_arg = None;
+            for attr in &variant.attrs {
+                match &attr.meta {
+                    syn::Meta::List(meta_list) if meta_list.path.is_ident("delegate_to") => {
+                        if delegate_to_arg.is_some() {
+                            return Err(syn::Error::new_spanned(
+                                attr,
+                                "#[delegate_to(...)] can appear at most once",
+                            ));
+                        }
+
+                        delegate_to_arg = Some(syn::parse2::<DelegateToArg>(meta_list.tokens.clone())?);
+                    }
+                    _ => {},
+                }
+            }
+
             let variant_ident = &variant.ident;
             match &variant.fields {
                 syn::Fields::Named(fields) => {
@@ -331,9 +371,14 @@ fn gen_impl_fn_enum(
                     }
 
                     let ident = fields.named[0].ident.as_ref().unwrap();
+                    let receiver = if let Some(delegate_to_arg) = delegate_to_arg {
+                        ident_replacer::replace_ident_in_expr(delegate_to_arg.ident, ident.clone(), delegate_to_arg.expr).to_token_stream()
+                    } else {
+                        ident.to_token_stream()
+                    };
 
                     Ok(quote! {
-                        Self::#variant_ident { #ident } => #trait_path::#method_ident(#ident #(,#args)*)
+                        Self::#variant_ident { #ident } => #trait_path::#method_ident(#receiver #(,#args)*)
                     })
                 }
                 syn::Fields::Unnamed(fields) => {
@@ -344,8 +389,14 @@ fn gen_impl_fn_enum(
                         ));
                     }
 
+                    let ident = syn::Ident::new("x", Span::call_site());
+                    let receiver = if let Some(delegate_to_arg) = delegate_to_arg {
+                        ident_replacer::replace_ident_in_expr(delegate_to_arg.ident, ident.clone(), delegate_to_arg.expr).to_token_stream()
+                    } else {
+                        ident.to_token_stream()
+                    };
                     Ok(quote! {
-                        Self::#variant_ident(x) => #trait_path::#method_ident(x #(,#args)*)
+                        Self::#variant_ident(x) => #trait_path::#method_ident(#receiver #(,#args)*)
                     })
                 }
                 syn::Fields::Unit => {
@@ -440,7 +491,7 @@ mod tests {
                 let args = $derive_delegate_args;
                 let input = $derive_delegate_input;
                 compare_result!(
-                    derive_delegate_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
+                    derive_delegate_aux(&mut storage, args, syn::parse2::<syn::Item>(input)?),
                     Ok($derive_delegate_expected)
                 );
 
@@ -484,7 +535,7 @@ mod tests {
                 let args = $derive_delegate_args;
                 let input = $derive_delegate_input;
                 compare_result!(
-                    derive_delegate_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
+                    derive_delegate_aux(&mut storage, args, syn::parse2::<syn::Item>(input)?),
                     Ok($derive_delegate_expected)
                 );
 
@@ -968,6 +1019,31 @@ mod tests {
             impl Hello<'p, str> for Hoge<'p> {
                 fn hello(&self) -> &'p str {
                     Hello::hello(&self.0)
+                }
+            }
+        },
+    }
+
+    test_as_ref! {
+        custom_receiver,
+        // derive_delegate
+        quote! { AsRef<str> },
+        quote! {
+            enum Hoge {
+                #[delegate_to(x => &x.0)]
+                A((String, u8)),
+            }
+        },
+        quote! {
+            enum Hoge {
+                A((String, u8)),
+            }
+
+            impl AsRef<str> for Hoge {
+                fn as_ref(&self) -> &str {
+                    match self {
+                        Self::A(x) => AsRef::as_ref(&x.0),
+                    }
                 }
             }
         },

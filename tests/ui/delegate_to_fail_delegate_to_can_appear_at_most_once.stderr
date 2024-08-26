@@ -1,0 +1,17 @@
+error: #[delegate_to(...)] can appear at most once
+  --> tests/ui/delegate_to_fail_delegate_to_can_appear_at_most_once.rs:15:5
+   |
+15 |     #[delegate_to(x => &x.0)]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot find attribute `delegate_to` in this scope
+  --> tests/ui/delegate_to_fail_delegate_to_can_appear_at_most_once.rs:14:7
+   |
+14 |     #[delegate_to(x => &x.0)]
+   |       ^^^^^^^^^^^
+
+error: cannot find attribute `delegate_to` in this scope
+  --> tests/ui/delegate_to_fail_delegate_to_can_appear_at_most_once.rs:15:7
+   |
+15 |     #[delegate_to(x => &x.0)]
+   |       ^^^^^^^^^^^
