@@ -1,5 +1,0 @@
-error: type name conflicted, arleady registered: path = external :: Hello
-  --> tests/ui/fail_register_conflicted.rs:10:35
-   |
-10 |         #[thin_delegate::register(external::Hello)]
-   |                                   ^^^^^^^^^^^^^^^

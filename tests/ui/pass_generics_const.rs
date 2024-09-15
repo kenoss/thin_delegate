@@ -1,13 +1,6 @@
+#[thin_delegate::register]
 pub trait Hello<T, const N: usize> {
     fn hello(&self) -> [T; N];
-}
-
-// TODO: Make `register()` is usable for trait definition.
-mod private_for_thin_delegate {
-    #[thin_delegate::register(Hello)]
-    pub trait Hello<T, const N: usize> {
-        fn hello(&self) -> [T; N];
-    }
 }
 
 impl Hello<u8, 4> for char {
@@ -18,8 +11,11 @@ impl Hello<u8, 4> for char {
     }
 }
 
-#[thin_delegate::derive_delegate(Hello<u8, 4>)]
+#[thin_delegate::register]
 struct Hoge(char);
+
+#[thin_delegate::derive_delegate]
+impl Hello<u8, 4> for Hoge {}
 
 fn main() {
     let hoge = Hoge('あ');

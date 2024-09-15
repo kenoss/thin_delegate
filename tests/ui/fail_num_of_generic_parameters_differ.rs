@@ -1,3 +1,4 @@
+#[thin_delegate::register]
 pub trait Hello<T> {
     fn hello(&self) -> String;
 }
@@ -14,18 +15,13 @@ impl<T> Hello<T> for char {
     }
 }
 
-// TODO: Make `register()` is usable for trait definition.
-mod private_for_thin_delegate {
-    #[thin_delegate::register(Hello)]
-    pub trait Hello<T> {
-        fn hello(&self) -> String;
-    }
-}
-
-#[thin_delegate::derive_delegate(Hello<u8, u16>)]
+#[thin_delegate::register]
 enum Hoge {
     A(String),
     B(char),
 }
+
+#[thin_delegate::derive_delegate]
+impl Hello<u8, u16> for Hoge {}
 
 fn main() {}

@@ -4,19 +4,37 @@ mod delegate_to_checker;
 mod delegate_to_remover;
 mod generic_param_replacer;
 mod ident_replacer;
-mod punctuated_parser;
-mod storage;
+mod self_replacer;
 
 use crate::delegate_to_arg::DelegateToArg;
 use crate::generic_param_replacer::GenericParamReplacer;
-use crate::punctuated_parser::PunctuatedParser;
-use crate::storage::Storage;
-use indoc::indoc;
-use itertools::Itertools;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::parse_macro_input;
+use std::ops::Deref;
 use syn::spanned::Spanned;
+
+fn macro_name_feed_trait_def_for<T>(trait_name: &T, span: Span) -> syn::Ident
+where
+    T: std::fmt::Display,
+{
+    syn::Ident::new(
+        &format!("__thin_delegate__feed_trait_def_for_{}", trait_name),
+        span,
+    )
+}
+
+fn macro_name_feed_structenum_def_for<T>(structenum_name: &T, span: Span) -> syn::Ident
+where
+    T: std::fmt::Display,
+{
+    syn::Ident::new(
+        &format!(
+            "__thin_delegate__feed_structenum_def_for_{}",
+            structenum_name
+        ),
+        span,
+    )
+}
 
 #[derive(Debug)]
 pub(crate) struct TraitData {
@@ -25,47 +43,29 @@ pub(crate) struct TraitData {
     sigs: Vec<syn::Signature>,
 }
 
-struct FnIngredient<'a> {
-    trait_path: &'a syn::Path,
-    sig: &'a syn::Signature,
-}
-
-#[derive(Debug)]
-pub(crate) struct StorableTraitData {
-    trait_path: String,
-    generics: String,
-    sigs: Vec<String>,
-}
-
-impl From<&TraitData> for StorableTraitData {
-    fn from(x: &TraitData) -> Self {
-        Self {
-            trait_path: x.trait_path.to_token_stream().to_string(),
-            generics: x.generics.to_token_stream().to_string(),
-            sigs: x
-                .sigs
-                .iter()
-                .map(|sig| sig.to_token_stream().to_string())
-                .collect(),
-        }
-    }
-}
-
-impl From<&StorableTraitData> for TraitData {
-    fn from(x: &StorableTraitData) -> Self {
-        Self {
-            trait_path: syn::parse2::<syn::Path>(x.trait_path.parse().unwrap()).unwrap(),
-            generics: syn::parse2::<syn::Generics>(x.generics.parse().unwrap()).unwrap(),
-            sigs: x
-                .sigs
-                .iter()
-                .map(|sig| syn::parse2::<syn::Signature>(sig.parse().unwrap()).unwrap())
-                .collect(),
-        }
-    }
-}
-
 impl TraitData {
+    pub fn new(trait_: &syn::ItemTrait, mut trait_path: syn::Path) -> Self {
+        trait_path.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
+
+        let sigs = trait_
+            .items
+            .iter()
+            .filter_map(|x| {
+                let syn::TraitItem::Fn(fn_) = x else {
+                    return None;
+                };
+
+                Some(fn_.sig.clone())
+            })
+            .collect();
+
+        TraitData {
+            trait_path,
+            generics: trait_.generics.clone(),
+            sigs,
+        }
+    }
+
     fn fn_ingredients(&self) -> impl Iterator<Item = FnIngredient<'_>> {
         self.sigs.iter().map(|sig| FnIngredient {
             trait_path: &self.trait_path,
@@ -80,6 +80,11 @@ impl TraitData {
 
         Ok(())
     }
+}
+
+struct FnIngredient<'a> {
+    trait_path: &'a syn::Path,
+    sig: &'a syn::Signature,
 }
 
 impl<'a> FnIngredient<'a> {
@@ -133,161 +138,236 @@ impl<'a> FnIngredient<'a> {
 #[proc_macro_attribute]
 pub fn register(
     args: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let item = parse_macro_input!(input as syn::Item);
-    let mut storage = Storage::global();
-
-    match register_aux(&mut storage, args.into(), &item) {
+    let item: TokenStream = item.into();
+    match register_aux(args.into(), item.clone()) {
         Ok(x) => x.into(),
-        Err(e) => TokenStream::from_iter([e.into_compile_error(), (quote! { #item })]).into(),
+        Err(e) => TokenStream::from_iter([e.into_compile_error(), item]).into(),
     }
 }
 
-fn register_aux(
-    storage: &mut Storage,
-    args: TokenStream,
-    item: &syn::Item,
-) -> syn::Result<TokenStream> {
-    if args.is_empty() {
-        return Err(syn::Error::new_spanned(
-            args,
-            "arguments must not be empty: `#[thin_delegate::register(<path>, ...)]`",
-        ));
+fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+    if !args.is_empty() {
+        return Err(syn::Error::new_spanned(args, "arguments must be empty"));
     }
 
-    let path = syn::parse2::<syn::Path>(args.clone()).map_err(|_| {
-        syn::Error::new_spanned(
-            args,
-            "type argument expected: `#[thin_delegate::register(<path>, ...)]`",
+    let mut item = syn::parse2::<syn::Item>(item.clone()).map_err(|_| {
+        syn::Error::new(
+            item.span(),
+            "expected `trait ...` or `struct ...` or `enum ...`",
         )
     })?;
+    let macro_def = match &item {
+        syn::Item::Trait(trait_) => {
+            // TODO: Support external crates.
+            let trait_path = syn::Path::from(syn::PathSegment::from(trait_.ident.clone()));
+            // Note that `trait_path` here is a kind of dummy. It's just used for creating `TraitData`.
+            let trait_data = TraitData::new(trait_, trait_path);
+            trait_data.validate()?;
 
-    let syn::Item::Trait(trait_) = item else {
-        return Err(syn::Error::new(item.span(), "expected `trait ...`"));
+            let feed_trait_def_for =
+                macro_name_feed_trait_def_for(&trait_.ident, trait_.ident.span());
+            quote! {
+                macro_rules! #feed_trait_def_for {
+                    {
+                        @KONT { $kont:path },
+                        $(@$arg_key:ident { $arg_value:tt },)*
+                    } => {
+                        $kont! {
+                            $(@$arg_key { $arg_value },)*
+                            @TRAIT_DEF { #trait_ },
+                        }
+                    }
+                }
+            }
+        }
+        syn::Item::Struct(structenum) => {
+            let feed_structenum_def_for =
+                macro_name_feed_structenum_def_for(&structenum.ident, structenum.ident.span());
+            quote! {
+                macro_rules! #feed_structenum_def_for {
+                    {
+                        @KONT { $kont:path },
+                        $(@$arg_key:ident { $arg_value:tt },)*
+                    } => {
+                        $kont! {
+                            $(@$arg_key { $arg_value },)*
+                            @STRUCTENUM_DEF { #structenum },
+                        }
+                    }
+                }
+            }
+        }
+        syn::Item::Enum(structenum) => {
+            let feed_structenum_def_for =
+                macro_name_feed_structenum_def_for(&structenum.ident, structenum.ident.span());
+            quote! {
+                macro_rules! #feed_structenum_def_for {
+                    {
+                        @KONT { $kont:path },
+                        $(@$arg_key:ident { $arg_value:tt },)*
+                    } => {
+                        $kont! {
+                            $(@$arg_key { $arg_value },)*
+                            @STRUCTENUM_DEF { #structenum },
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            return Err(syn::Error::new_spanned(
+                item,
+                "expected `trait ...` or `struct ...` or `enum ...`",
+            ));
+        }
     };
-
-    if path.segments.last().unwrap().arguments != syn::PathArguments::None {
-        return Err(syn::Error::new_spanned(
-            path,
-            "argument must be a path without generic paramteres, like in `use ...`",
-        ));
-    }
-
-    let sigs = trait_
-        .items
-        .iter()
-        .filter_map(|x| {
-            let syn::TraitItem::Fn(fn_) = x else {
-                return None;
-            };
-
-            Some(fn_.sig.clone())
-        })
-        .collect_vec();
-    let trait_data = TraitData {
-        trait_path: path.clone(),
-        generics: trait_.generics.clone(),
-        sigs,
-    };
-    trait_data.validate()?;
-
-    storage.store(&path, &trait_data)?;
-
-    // TODO: Split `register()` and `register_temporarily()` and return tokens for the former.
-    Ok(TokenStream::new())
-}
-
-#[proc_macro_attribute]
-pub fn derive_delegate(
-    args: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    let input_ = input.clone();
-    let item = parse_macro_input!(input_ as syn::Item);
-    let mut storage = Storage::global();
 
     #[cfg(not(feature = "unstable_delegate_to"))]
     {
-        let mut item = item.clone();
-        match delegate_to_checker::check_non_existence(&mut item) {
-            Ok(()) => {}
-            Err(e) => {
-                return TokenStream::from_iter([e.into_compile_error(), input.into()]).into();
-            }
-        }
+        delegate_to_checker::check_non_existence(&mut item)?;
     }
-
-    match derive_delegate_aux(&mut storage, args.into(), item) {
-        Ok(x) => x.into(),
-        Err(e) => TokenStream::from_iter([e.into_compile_error(), input.into()]).into(),
-    }
-}
-
-fn derive_delegate_aux(
-    storage: &mut Storage,
-    args: TokenStream,
-    // Mutation is allowed only for removing attributes used, e.g. `#[delegate_to(...)]`.
-    mut item: syn::Item,
-) -> syn::Result<TokenStream> {
-    if args.is_empty() {
-        return Err(syn::Error::new_spanned(
-            args,
-            "arguments must not be empty `#[thin_delegate::derive_delegate(<path>, ...)]`",
-        ));
-    }
-
-    let paths = syn::parse2::<PunctuatedParser<syn::Path, syn::token::Comma>>(args)?.into_inner();
-
-    let impls = paths
-        .iter()
-        .map(|path| derive_delegate_aux_1(storage, &item, path))
-        .collect::<syn::Result<Vec<_>>>()?;
-
-    // Remove `#[delegate_to(...)]` here, as all calls of `derive_delegate_aux_1()` require the attributes.
     delegate_to_remover::remove_delegate_to(&mut item);
 
     Ok(quote! {
         #item
 
-        #(#impls)*
+        #macro_def
     })
 }
 
-fn derive_delegate_aux_1(
-    storage: &mut Storage,
-    item: &syn::Item,
-    path: &syn::Path,
-) -> syn::Result<TokenStream> {
-    let Some(trait_data) = storage.get(path) else {
-        return Err(syn::Error::new(
-            Span::call_site(),
-            format!(
-                indoc! {r#"
-                    trait not registered: path = {path}
+#[proc_macro_attribute]
+pub fn derive_delegate(
+    args: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let item: TokenStream = item.into();
 
-                    hint: Add `#[thin_delegate::register({path})]` for trait `{path}`
-                "#},
-                path = path.to_token_stream(),
-            ),
-        ));
+    match derive_delegate_aux(args.into(), item.clone()) {
+        Ok(x) => x.into(),
+        Err(e) => TokenStream::from_iter([e.into_compile_error(), item]).into(),
+    }
+}
+
+fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+    if !args.is_empty() {
+        return Err(syn::Error::new_spanned(args, "arguments must be empty"));
+    }
+
+    let e = syn::Error::new_spanned(&item, "expected `impl <Trait> for <Type>`");
+    let item = syn::parse2::<syn::Item>(item).map_err(|_| e.clone())?;
+    let syn::Item::Impl(impl_) = item else {
+        return Err(e);
+    };
+    let Some((_, trait_path, _)) = &impl_.trait_ else {
+        return Err(e);
+    };
+    let syn::Type::Path(structenum_path) = impl_.self_ty.deref() else {
+        return Err(e);
     };
 
-    if trait_data.sigs.is_empty() {
-        return Ok(quote! {});
+    let trait_ident = &trait_path.segments.last().unwrap().ident;
+    let structenum_ident = &structenum_path.path.segments.last().unwrap().ident;
+
+    let feed_trait_def_for = macro_name_feed_trait_def_for(&trait_ident, trait_ident.span());
+    let feed_structenum_def_for =
+        macro_name_feed_structenum_def_for(&structenum_ident, structenum_ident.span());
+
+    // Collect trait and structenum defs by CPS:
+    //
+    //    #feed_trait_def_for!
+    // -> __thin_delegate__trampoline1!
+    // -> #feed_structenum_def_for!
+    // -> __thin_delegate__trampoline2!
+    // -> #[::thin_delegate::internal_derive_delegate]
+    Ok(quote! {
+        macro_rules! __thin_delegate__trampoline2 {
+            {
+                @IMPL {{ $impl:item }},
+                @TRAIT_DEF { $trait_def:item },
+                @STRUCTENUM_DEF { $structenum_def:item },
+            } => {
+                // TODO: Add a test that uses `#[thin_delegate::derive_delegate]` twice.
+                #[::thin_delegate::internal_derive_delegate]
+                mod __thin_delegate__change_this_name {
+                    $trait_def
+
+                    $structenum_def
+
+                    $impl
+                }
+            }
+        }
+
+        macro_rules! __thin_delegate__trampoline1 {
+            {
+                @IMPL {{ $impl:item }},
+                @TRAIT_DEF { $trait_def:item },
+            } => {
+                #feed_structenum_def_for! {
+                    @KONT { __thin_delegate__trampoline2 },
+                    @IMPL {{ $impl }},
+                    @TRAIT_DEF { $trait_def },
+                }
+            }
+        }
+
+        #feed_trait_def_for! {
+            @KONT { __thin_delegate__trampoline1 },
+            @IMPL {{ #impl_ }},
+        }
+    })
+}
+
+#[proc_macro_attribute]
+pub fn internal_derive_delegate(
+    args: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    match internal_derive_delegate_aux(args.into(), input.into()) {
+        Ok(x) => x.into(),
+        Err(e) => TokenStream::from_iter([e.into_compile_error()]).into(),
     }
+}
+
+fn internal_derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+    if !args.is_empty() {
+        panic!();
+    }
+
+    let item = syn::parse2::<syn::Item>(item.clone()).unwrap();
+    let syn::Item::Mod(mod_) = item else {
+        panic!();
+    };
+    let content = &mod_.content.as_ref().unwrap().1;
+    assert_eq!(content.len(), 3);
+    let syn::Item::Trait(trait_) = &content[0] else {
+        panic!();
+    };
+    let structenum = &content[1];
+    let syn::Item::Impl(impl_) = &content[2] else {
+        panic!();
+    };
+    // TODO: Support exceptional methods.
+    assert!(impl_.items.is_empty());
+    let Some((_, trait_path, _)) = &impl_.trait_ else {
+        panic!()
+    };
+
+    let trait_data = TraitData::new(trait_, trait_path.clone());
 
     let generic_param_replacer = GenericParamReplacer::new(
         &trait_data.generics,
-        &path.segments.last().unwrap().arguments,
+        &trait_path.segments.last().unwrap().arguments,
     )?;
 
     let funcs = trait_data
         .fn_ingredients()
-        .map(|fn_ingredient| gen_impl_fn(&generic_param_replacer, item, fn_ingredient))
+        .map(|fn_ingredient| gen_impl_fn(&generic_param_replacer, structenum, fn_ingredient))
         .collect::<syn::Result<Vec<_>>>()?;
 
-    let item_name = match item {
+    let item_name = match &structenum {
         syn::Item::Enum(enum_) => {
             let ident = &enum_.ident;
             let generics = &enum_.generics;
@@ -300,14 +380,14 @@ fn derive_delegate_aux_1(
         }
         _ => {
             return Err(syn::Error::new(
-                item.span(),
+                structenum.span(),
                 "expected `enum ...` or `struct ...`",
             ));
         }
     };
 
     Ok(quote! {
-        impl #path for #item_name {
+        impl #trait_path for #item_name {
             #(#funcs)*
         }
     })
@@ -410,6 +490,7 @@ fn gen_impl_fn_enum(
         .collect::<syn::Result<Vec<_>>>()?;
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
+    let sig = self_replacer::make_self_hygienic_in_signature(sig);
     Ok(quote! {
         #sig {
             match self {
@@ -441,6 +522,7 @@ fn gen_impl_fn_struct(
     let receiver = quote! { #receiver_prefix self.#field_ident };
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
+    let sig = self_replacer::make_self_hygienic_in_signature(sig);
     let trait_path = &fn_ingredient.trait_path;
     let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
@@ -454,7 +536,6 @@ fn gen_impl_fn_struct(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::TestStorageFactory;
 
     macro_rules! compare_result {
         ($got:expr, $expected:expr) => {
@@ -466,132 +547,37 @@ mod tests {
         };
     }
 
-    macro_rules! test_register_derive_delegate {
+    macro_rules! test_internal_derive_delegate {
         (
             $test_name:ident,
-            $register_args:expr,
-            $register_input:expr,
-            $register_expected:expr,
-            $derive_delegate_args:expr,
-            $derive_delegate_input:expr,
-            $derive_delegate_expected:expr,
+            $input:expr,
+            $expected:expr,
         ) => {
             #[test]
-            fn $test_name() -> Result<(), syn::Error> {
-                let mut factory = TestStorageFactory::new();
-                let mut storage = factory.factory();
+            fn $test_name() -> syn::Result<()> {
+                let args = TokenStream::new();
+                let input: TokenStream = $input;
+                let expected: TokenStream = $expected;
 
-                let args = $register_args;
-                let input = $register_input;
-                compare_result!(
-                    register_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
-                    Ok($register_expected)
-                );
-
-                let args = $derive_delegate_args;
-                let input = $derive_delegate_input;
-                compare_result!(
-                    derive_delegate_aux(&mut storage, args, syn::parse2::<syn::Item>(input)?),
-                    Ok($derive_delegate_expected)
-                );
-
-                Ok(())
-            }
-        };
-    }
-
-    macro_rules! test_register_register_derive_delegate {
-        (
-            $test_name:ident,
-            $register1_args:expr,
-            $register1_input:expr,
-            $register1_expected:expr,
-            $register2_args:expr,
-            $register2_input:expr,
-            $register2_expected:expr,
-            $derive_delegate_args:expr,
-            $derive_delegate_input:expr,
-            $derive_delegate_expected:expr,
-        ) => {
-            #[test]
-            fn $test_name() -> Result<(), syn::Error> {
-                let mut factory = TestStorageFactory::new();
-                let mut storage = factory.factory();
-
-                let args = $register1_args;
-                let input = $register1_input;
-                compare_result!(
-                    register_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
-                    Ok($register1_expected)
-                );
-
-                let args = $register2_args;
-                let input = $register2_input;
-                compare_result!(
-                    register_aux(&mut storage, args, &syn::parse2::<syn::Item>(input)?),
-                    Ok($register2_expected)
-                );
-
-                let args = $derive_delegate_args;
-                let input = $derive_delegate_input;
-                compare_result!(
-                    derive_delegate_aux(&mut storage, args, syn::parse2::<syn::Item>(input)?),
-                    Ok($derive_delegate_expected)
-                );
-
-                Ok(())
-            }
-        };
-    }
-
-    macro_rules! test_as_ref {
-        (
-            $test_name:ident,
-            $derive_delegate_args:expr,
-            $derive_delegate_input:expr,
-            $derive_delegate_expected:expr,
-        ) => {
-            test_register_derive_delegate! {
-                $test_name,
-                // register
-                quote! { AsRef },
-                quote! {
-                    pub trait AsRef<T: ?Sized> {
-                        /// Converts this type into a shared reference of the (usually inferred) input type.
-                        #[stable(feature = "rust1", since = "1.0.0")]
-                        fn as_ref(&self) -> &T;
+                let input = quote! {
+                    mod __thin_delegate__test_mod {
+                        #input
                     }
-                },
-                quote! {},
-                // derive_delegate
-                $derive_delegate_args,
-                $derive_delegate_input,
-                $derive_delegate_expected,
+                };
+                compare_result!(internal_derive_delegate_aux(args, input), Ok(expected));
+
+                Ok(())
             }
         };
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         r#enum,
-        // register
-        quote! { Hello },
         quote! {
-            pub trait Hello {
+            trait Hello {
                 fn hello(&self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
-            enum Hoge {
-                Named {
-                    named: String,
-                },
-                Unnamed(char),
-            }
-        },
-        quote! {
+
             enum Hoge {
                 Named {
                     named: String,
@@ -599,6 +585,9 @@ mod tests {
                 Unnamed(char),
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(&self) -> String {
                     match self {
@@ -610,98 +599,76 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         enum_ref_mut_receiver,
-        // register
-        quote! { Hello },
         quote! {
             pub trait Hello {
                 fn hello(&mut self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
+
             enum Hoge {
-                A(String),
-                B(char),
-            }
-        },
-        quote! {
-            enum Hoge {
-                A(String),
-                B(char),
+                Named {
+                    named: String,
+                },
+                Unnamed(char),
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(&mut self) -> String {
                     match self {
-                        Self::A(x) => Hello::hello(x),
-                        Self::B(x) => Hello::hello(x),
+                        Self::Named { named } => Hello::hello(named),
+                        Self::Unnamed(x) => Hello::hello(x),
                     }
                 }
             }
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         enum_consume_receiver,
-        // register
-        quote! { Hello },
         quote! {
-            pub trait Hello {
+            trait Hello {
                 fn hello(self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
+
             enum Hoge {
-                A(String),
-                B(char),
-            }
-        },
-        quote! {
-            enum Hoge {
-                A(String),
-                B(char),
+                Named {
+                    named: String,
+                },
+                Unnamed(char),
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(self) -> String {
                     match self {
-                        Self::A(x) => Hello::hello(x),
-                        Self::B(x) => Hello::hello(x),
+                        Self::Named { named } => Hello::hello(named),
+                        Self::Unnamed(x) => Hello::hello(x),
                     }
                 }
             }
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         struct_with_named_field,
-        // register
-        quote! { Hello },
         quote! {
-            pub trait Hello {
+            trait Hello {
                 fn hello(&self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
-            struct Hoge {
-                s: String,
-            }
-        },
-        quote! {
+
             struct Hoge {
                 s: String,
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(&self) -> String {
                     Hello::hello(&self.s)
@@ -710,24 +677,18 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         struct_with_unnamed_field,
-        // register
-        quote! { Hello },
         quote! {
-            pub trait Hello {
+            trait Hello {
                 fn hello(&self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
-            struct Hoge(String);
-        },
-        quote! {
+
             struct Hoge(String);
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(&self) -> String {
                     Hello::hello(&self.0)
@@ -736,28 +697,20 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         struct_ref_mut_receiver,
-        // register
-        quote! { Hello },
         quote! {
-            pub trait Hello {
+            trait Hello {
                 fn hello(&mut self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
-            struct Hoge {
-                s: String,
-            }
-        },
-        quote! {
+
             struct Hoge {
                 s: String,
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(&mut self) -> String {
                     Hello::hello(&mut self.s)
@@ -766,28 +719,20 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         struct_consume_receiver,
-        // register
-        quote! { Hello },
         quote! {
-            pub trait Hello {
+            trait Hello {
                 fn hello(self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
-            struct Hoge {
-                s: String,
-            }
-        },
-        quote! {
+
             struct Hoge {
                 s: String,
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(self) -> String {
                     Hello::hello(self.s)
@@ -796,30 +741,21 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         method_with_args,
-        // register
-        quote! { Hello },
         quote! {
-            pub trait Hello {
+            trait Hello {
                 fn hello(&self, prefix: &str) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
-            enum Hoge {
-                A(String),
-                B(char),
-            }
-        },
-        quote! {
+
             enum Hoge {
                 A(String),
                 B(char),
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(&self, prefix: &str) -> String {
                     match self {
@@ -831,30 +767,21 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
-        super_crate,
-        // register
-        quote! { Hello },
+    test_internal_derive_delegate! {
+        super_trait,
         quote! {
-            pub trait Hello: ToString {
+            trait Hello: ToString {
                 fn hello(&self) -> String;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello },
-        quote! {
-            enum Hoge {
-                A(String),
-                B(char),
-            }
-        },
-        quote! {
+
             enum Hoge {
                 A(String),
                 B(char),
             }
 
+            impl Hello for Hoge {}
+        },
+        quote! {
             impl Hello for Hoge {
                 fn hello(&self) -> String {
                     match self {
@@ -866,87 +793,23 @@ mod tests {
         },
     }
 
-    test_register_register_derive_delegate! {
-        multiple_derive,
-        // register
-        quote! { ToString },
-        quote! {
-            pub trait ToString {
-                /// Converts the given value to a `String`.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// let i = 5;
-                /// let five = String::from("5");
-                ///
-                /// assert_eq!(five, i.to_string());
-                /// ```
-                #[rustc_conversion_suggestion]
-                #[stable(feature = "rust1", since = "1.0.0")]
-                #[cfg_attr(not(test), rustc_diagnostic_item = "to_string_method")]
-                fn to_string(&self) -> String;
-            }
-        },
-        quote! {},
-        // register
-        quote! { Hello },
-        quote! {
-            pub trait Hello: ToString {
-                fn hello(&self) -> String;
-            }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { ToString, Hello },
-        quote! {
-            enum Hoge {
-                A(String),
-                B(char),
-            }
-        },
-        quote! {
-            enum Hoge {
-                A(String),
-                B(char),
-            }
-
-            impl ToString for Hoge {
-                fn to_string(&self) -> String {
-                    match self {
-                        Self::A(x) => ToString::to_string(x),
-                        Self::B(x) => ToString::to_string(x),
-                    }
-                }
-            }
-
-            impl Hello for Hoge {
-                fn hello(&self) -> String {
-                    match self {
-                        Self::A(x) => Hello::hello(x),
-                        Self::B(x) => Hello::hello(x),
-                    }
-                }
-            }
-        },
-    }
-
-    test_as_ref! {
+    test_internal_derive_delegate! {
         generics_enum,
-        // derive_delegate
-        quote! { AsRef<str> },
         quote! {
-            enum Hoge {
-                A(String),
-                B(char),
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
             }
-        },
-        quote! {
+
             enum Hoge {
                 A(String),
                 B(char),
             }
 
+            impl AsRef<str> for Hoge {}
+        },
+        quote! {
             impl AsRef<str> for Hoge {
                 fn as_ref(&self) -> &str {
                     match self {
@@ -958,20 +821,22 @@ mod tests {
         },
     }
 
-    test_as_ref! {
+    test_internal_derive_delegate! {
         generics_struct,
-        // derive_delegate
-        quote! { AsRef<str> },
         quote! {
-            struct Hoge {
-                s: String,
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
             }
-        },
-        quote! {
+
             struct Hoge {
                 s: String,
             }
 
+            impl AsRef<str> for Hoge {}
+        },
+        quote! {
             impl AsRef<str> for Hoge {
                 fn as_ref(&self) -> &str {
                     AsRef::as_ref(&self.s)
@@ -980,16 +845,20 @@ mod tests {
         },
     }
 
-    test_as_ref! {
+    test_internal_derive_delegate! {
         generics_specilize_complex,
-        // derive_delegate
-        quote! { AsRef<(dyn Fn(usize) -> usize + 'static)> },
         quote! {
-            struct Hoge(Box<dyn Fn(usize) -> usize>);
-        },
-        quote! {
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
+            }
+
             struct Hoge(Box<dyn Fn(usize) -> usize>);
 
+            impl AsRef<(dyn Fn(usize) -> usize + 'static)> for Hoge {}
+        },
+        quote! {
             impl AsRef<(dyn Fn(usize) -> usize + 'static)> for Hoge {
                 fn as_ref(&self) -> &(dyn Fn(usize) -> usize + 'static) {
                     AsRef::as_ref(&self.0)
@@ -998,24 +867,18 @@ mod tests {
         },
     }
 
-    test_register_derive_delegate! {
+    test_internal_derive_delegate! {
         generics_specilize_lifetime,
-        // register
-        quote! { Hello },
         quote! {
             pub trait Hello<'a, T> {
                 fn hello(&self) -> &'a T;
             }
-        },
-        quote! {},
-        // derive_delegate
-        quote! { Hello<'p, str> },
-        quote! {
-            struct Hoge<'p>(&'p str);
-        },
-        quote! {
+
             struct Hoge<'p>(&'p str);
 
+            impl Hello<'p, str> for Hoge<'p> {}
+        },
+        quote! {
             impl Hello<'p, str> for Hoge<'p> {
                 fn hello(&self) -> &'p str {
                     Hello::hello(&self.0)
@@ -1024,21 +887,23 @@ mod tests {
         },
     }
 
-    test_as_ref! {
+    test_internal_derive_delegate! {
         custom_receiver,
-        // derive_delegate
-        quote! { AsRef<str> },
         quote! {
+            pub trait AsRef<T: ?Sized> {
+                /// Converts this type into a shared reference of the (usually inferred) input type.
+                #[stable(feature = "rust1", since = "1.0.0")]
+                fn as_ref(&self) -> &T;
+            }
+
             enum Hoge {
                 #[delegate_to(x => &x.0)]
                 A((String, u8)),
             }
+
+            impl AsRef<str> for Hoge {}
         },
         quote! {
-            enum Hoge {
-                A((String, u8)),
-            }
-
             impl AsRef<str> for Hoge {
                 fn as_ref(&self) -> &str {
                     match self {

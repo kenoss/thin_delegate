@@ -1,0 +1,5 @@
+error: expected `impl <Trait> for <Type>`
+ --> tests/ui/fail_derive_delegate_for_impl_without_trait.rs:5:1
+  |
+5 | impl Hoge {}
+  | ^^^^^^^^^^^^

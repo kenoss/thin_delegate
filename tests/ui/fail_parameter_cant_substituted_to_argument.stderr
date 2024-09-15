@@ -1,0 +1,7 @@
+error: parameter can't be substituted to argument:
+           in definition of trait         = < 'a, T >
+           in definition of derive target = < String, String >
+  --> tests/ui/fail_parameter_cant_substituted_to_argument.rs:10:12
+   |
+10 | impl Hello<String, String> for Hoge {}
+   |            ^^^^^^

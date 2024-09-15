@@ -1,0 +1,7 @@
+error: number of generic parameters must coinside:
+           in definition of trait         = < T >
+           in definition of derive target = < u8, u16 >
+  --> tests/ui/fail_num_of_generic_parameters_differ.rs:25:11
+   |
+25 | impl Hello<u8, u16> for Hoge {}
+   |           ^^^^^^^^^
