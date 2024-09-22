@@ -1,11 +1,11 @@
-error: cannot find macro `__thin_delegate__feed_trait_def_for_ToString` in this scope
+error: cannot find macro `__thin_delegate__feed_trait_def_of_ToString` in this scope
  --> tests/ui/fail_register_for_trait_missing.rs:8:6
   |
 1 | #[thin_delegate::register]
-  | -------------------------- similarly named macro `__thin_delegate__feed_structenum_def_for_Hoge` defined here
+  | -------------------------- similarly named macro `__thin_delegate__feed_structenum_def_of_Hoge` defined here
 ...
 8 | impl ToString for Hoge {}
-  |      ^^^^^^^^ help: a macro with a similar name exists: `__thin_delegate__feed_structenum_def_for_Hoge`
+  |      ^^^^^^^^ help: a macro with a similar name exists: `__thin_delegate__feed_structenum_def_of_Hoge`
 
 warning: unused import: `Hoge`
  --> tests/ui/fail_register_for_trait_missing.rs:2:6

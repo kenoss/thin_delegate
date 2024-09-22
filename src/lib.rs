@@ -114,19 +114,19 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
             let trait_data = TraitData::new(trait_, trait_path);
             trait_data.validate()?;
 
-            decl_macro::define_macro_feed_trait_def_for(
+            decl_macro::define_macro_feed_trait_def_of(
                 &trait_.ident,
                 trait_.ident.span(),
                 is_external,
                 trait_,
             )
         }
-        syn::Item::Struct(structenum) => decl_macro::define_macro_feed_structenum_def_for(
+        syn::Item::Struct(structenum) => decl_macro::define_macro_feed_structenum_def_of(
             &structenum.ident,
             structenum.ident.span(),
             structenum.to_token_stream(),
         ),
-        syn::Item::Enum(structenum) => decl_macro::define_macro_feed_structenum_def_for(
+        syn::Item::Enum(structenum) => decl_macro::define_macro_feed_structenum_def_of(
             &structenum.ident,
             structenum.ident.span(),
             structenum.to_token_stream(),
