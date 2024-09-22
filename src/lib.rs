@@ -1,4 +1,5 @@
 mod attr_remover;
+mod decl_macro;
 mod delegate_to_arg;
 #[cfg(not(feature = "unstable_delegate_to"))]
 mod delegate_to_checker;
@@ -17,27 +18,6 @@ use quote::{quote, ToTokens};
 use std::ops::Deref;
 use syn::parse_quote;
 use syn::spanned::Spanned;
-
-fn macro_name_feed_trait_def_for<T>(trait_name: &T, span: Span, is_external: bool) -> syn::Ident
-where
-    T: std::fmt::Display,
-{
-    let external = if is_external { "external_" } else { "" };
-    syn::Ident::new(
-        &format!("__thin_delegate__feed_trait_def_for_{external}{trait_name}"),
-        span,
-    )
-}
-
-fn macro_name_feed_structenum_def_for<T>(structenum_name: &T, span: Span) -> syn::Ident
-where
-    T: std::fmt::Display,
-{
-    syn::Ident::new(
-        &format!("__thin_delegate__feed_structenum_def_for_{structenum_name}",),
-        span,
-    )
-}
 
 #[derive(Debug)]
 pub(crate) struct TraitData {
@@ -233,59 +213,23 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
             let trait_data = TraitData::new(trait_, trait_path);
             trait_data.validate()?;
 
-            let feed_trait_def_for =
-                macro_name_feed_trait_def_for(&trait_.ident, trait_.ident.span(), is_external);
-            quote! {
-                macro_rules! #feed_trait_def_for {
-                    {
-                        @KONT { $kont:path },
-                        $(@$arg_key:ident { $arg_value:tt },)*
-                    } => {
-                        $kont! {
-                            $(@$arg_key { $arg_value },)*
-                            @TRAIT_DEF { #trait_ },
-                        }
-                    }
-                }
-                pub(crate) use #feed_trait_def_for;
-            }
+            decl_macro::define_macro_feed_trait_def_for(
+                &trait_.ident,
+                trait_.ident.span(),
+                is_external,
+                trait_,
+            )
         }
-        syn::Item::Struct(structenum) => {
-            let feed_structenum_def_for =
-                macro_name_feed_structenum_def_for(&structenum.ident, structenum.ident.span());
-            quote! {
-                macro_rules! #feed_structenum_def_for {
-                    {
-                        @KONT { $kont:path },
-                        $(@$arg_key:ident { $arg_value:tt },)*
-                    } => {
-                        $kont! {
-                            $(@$arg_key { $arg_value },)*
-                            @STRUCTENUM_DEF { #structenum },
-                        }
-                    }
-                }
-                pub(crate) use #feed_structenum_def_for;
-            }
-        }
-        syn::Item::Enum(structenum) => {
-            let feed_structenum_def_for =
-                macro_name_feed_structenum_def_for(&structenum.ident, structenum.ident.span());
-            quote! {
-                macro_rules! #feed_structenum_def_for {
-                    {
-                        @KONT { $kont:path },
-                        $(@$arg_key:ident { $arg_value:tt },)*
-                    } => {
-                        $kont! {
-                            $(@$arg_key { $arg_value },)*
-                            @STRUCTENUM_DEF { #structenum },
-                        }
-                    }
-                }
-                pub(crate) use #feed_structenum_def_for;
-            }
-        }
+        syn::Item::Struct(structenum) => decl_macro::define_macro_feed_structenum_def_for(
+            &structenum.ident,
+            structenum.ident.span(),
+            structenum.to_token_stream(),
+        ),
+        syn::Item::Enum(structenum) => decl_macro::define_macro_feed_structenum_def_for(
+            &structenum.ident,
+            structenum.ident.span(),
+            structenum.to_token_stream(),
+        ),
         _ => {
             return Err(syn::Error::new_spanned(
                 item,
@@ -350,62 +294,12 @@ fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<Toke
     let trait_ident = &trait_path.segments.last().unwrap().ident;
     let structenum_ident = &structenum_path.path.segments.last().unwrap().ident;
 
-    let feed_trait_def_for = if let Some(external_trait_def) = &external_trait_def {
-        let feed_trait_def_for =
-            macro_name_feed_trait_def_for(&trait_ident, trait_ident.span(), true);
-        quote! { #external_trait_def::#feed_trait_def_for }
-    } else {
-        let feed_trait_def_for =
-            macro_name_feed_trait_def_for(&trait_ident, trait_ident.span(), false);
-        quote! { #feed_trait_def_for }
-    };
-    let feed_structenum_def_for =
-        macro_name_feed_structenum_def_for(&structenum_ident, structenum_ident.span());
-
-    // Collect trait and structenum defs by CPS:
-    //
-    //    #feed_trait_def_for!
-    // -> __thin_delegate__trampoline1!
-    // -> #feed_structenum_def_for!
-    // -> __thin_delegate__trampoline2!
-    // -> #[::thin_delegate::internal_derive_delegate]
-    Ok(quote! {
-        macro_rules! __thin_delegate__trampoline2 {
-            {
-                @IMPL {{ $impl:item }},
-                @TRAIT_DEF { $trait_def:item },
-                @STRUCTENUM_DEF { $structenum_def:item },
-            } => {
-                // TODO: Add a test that uses `#[thin_delegate::derive_delegate]` twice.
-                #[::thin_delegate::internal_derive_delegate]
-                mod __thin_delegate__change_this_name {
-                    $trait_def
-
-                    $structenum_def
-
-                    $impl
-                }
-            }
-        }
-
-        macro_rules! __thin_delegate__trampoline1 {
-            {
-                @IMPL {{ $impl:item }},
-                @TRAIT_DEF { $trait_def:item },
-            } => {
-                #feed_structenum_def_for! {
-                    @KONT { __thin_delegate__trampoline2 },
-                    @IMPL {{ $impl }},
-                    @TRAIT_DEF { $trait_def },
-                }
-            }
-        }
-
-        #feed_trait_def_for! {
-            @KONT { __thin_delegate__trampoline1 },
-            @IMPL {{ #impl_ }},
-        }
-    })
+    Ok(decl_macro::exec_internal_derive_delegate(
+        trait_ident,
+        structenum_ident,
+        &external_trait_def,
+        &impl_,
+    ))
 }
 
 #[proc_macro_attribute]
@@ -420,6 +314,8 @@ pub fn internal_derive_delegate(
 }
 
 fn internal_derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+    // We'll use panic here as it is only used by this crate.
+
     if !args.is_empty() {
         panic!();
     }
