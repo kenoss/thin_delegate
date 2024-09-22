@@ -50,7 +50,7 @@ pub(crate) fn define_macro_feed_trait_def_of(
 pub(crate) fn define_macro_feed_structenum_def_of(
     ident: &syn::Ident,
     span: Span,
-    structenum: TokenStream,
+    structenum: &syn::Item,
 ) -> TokenStream {
     let feed_structenum_def_of = macro_name_feed_structenum_def_of(ident, span);
     quote! {

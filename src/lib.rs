@@ -14,7 +14,7 @@ mod self_replacer;
 use crate::derive_delegate_args::DeriveDelegateArgs;
 use crate::gen::TraitData;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::quote;
 use std::ops::Deref;
 use syn::parse_quote;
 use syn::spanned::Spanned;
@@ -124,12 +124,12 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
         syn::Item::Struct(structenum) => decl_macro::define_macro_feed_structenum_def_of(
             &structenum.ident,
             structenum.ident.span(),
-            structenum.to_token_stream(),
+            &item,
         ),
         syn::Item::Enum(structenum) => decl_macro::define_macro_feed_structenum_def_of(
             &structenum.ident,
             structenum.ident.span(),
-            structenum.to_token_stream(),
+            &item,
         ),
         _ => {
             return Err(syn::Error::new_spanned(
