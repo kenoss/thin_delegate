@@ -12,14 +12,15 @@ use smithay::input::Seat;
 use smithay::input::SeatHandler;
 use smithay::utils::Serial;
 
-mod private_for_thin_delegate {
-    #[thin_delegate::register(smithay::utils::IsAlive)]
+#[thin_delegate::external_trait_def]
+mod __external_trait_def {
+    #[thin_delegate::register]
     pub trait IsAlive {
         /// Check if object is alive
         fn alive(&self) -> bool;
     }
 
-    #[thin_delegate::register(smithay::input::keyboard::KeyboardTarget)]
+    #[thin_delegate::register]
     pub trait KeyboardTarget<D>: IsAlive + PartialEq + Clone + fmt::Debug + Send
     where
         D: SeatHandler,
@@ -48,7 +49,7 @@ mod private_for_thin_delegate {
         );
     }
 
-    #[thin_delegate::register(smithay::input::pointer::PointerTarget)]
+    #[thin_delegate::register]
     pub trait PointerTarget<D>: IsAlive + PartialEq + Clone + fmt::Debug + Send
     where
         D: SeatHandler,
@@ -107,7 +108,7 @@ mod private_for_thin_delegate {
         }
     }
 
-    #[thin_delegate::register(smithay::input::touch::TouchTarget)]
+    #[thin_delegate::register]
     pub trait TouchTarget<D>: IsAlive + PartialEq + Clone + fmt::Debug + Send
     where
         D: SeatHandler,
@@ -163,8 +164,11 @@ mod private_for_thin_delegate {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[thin_delegate::derive_delegate(smithay::utils::IsAlive)]
+#[thin_delegate::register]
 struct Window(smithay::desktop::Window);
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::utils::IsAlive for Window {}
 
 impl smithay::input::keyboard::KeyboardTarget<State> for Window {
     fn enter(
@@ -235,8 +239,11 @@ impl smithay::input::keyboard::KeyboardTarget<State> for Window {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[thin_delegate::derive_delegate(smithay::utils::IsAlive)]
+#[thin_delegate::register]
 struct LayerSurface(smithay::desktop::LayerSurface);
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::utils::IsAlive for LayerSurface {}
 
 impl smithay::input::keyboard::KeyboardTarget<State> for LayerSurface {
     fn enter(
@@ -277,8 +284,11 @@ impl smithay::input::keyboard::KeyboardTarget<State> for LayerSurface {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[thin_delegate::derive_delegate(smithay::utils::IsAlive)]
+#[thin_delegate::register]
 struct PopupKind(smithay::desktop::PopupKind);
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::utils::IsAlive for PopupKind {}
 
 impl smithay::input::keyboard::KeyboardTarget<State> for PopupKind {
     fn enter(
@@ -319,26 +329,34 @@ impl smithay::input::keyboard::KeyboardTarget<State> for PopupKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[thin_delegate::derive_delegate(
-    smithay::utils::IsAlive,
-    smithay::input::keyboard::KeyboardTarget<State>,
-)]
+#[thin_delegate::register]
 enum KeyboardFocusTarget {
     Window(Window),
     LayerSurface(LayerSurface),
     Popup(PopupKind),
 }
 
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::utils::IsAlive for KeyboardFocusTarget {}
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::input::keyboard::KeyboardTarget<State> for KeyboardFocusTarget {}
+
 #[derive(Debug, Clone, PartialEq)]
-#[thin_delegate::derive_delegate(
-    smithay::utils::IsAlive,
-    smithay::input::pointer::PointerTarget<State>,
-    smithay::input::touch::TouchTarget<State>,
-)]
+#[thin_delegate::register]
 enum PointerFocusTarget {
     WlSurface(smithay::reexports::wayland_server::protocol::wl_surface::WlSurface),
     X11Surface(smithay::xwayland::X11Surface),
 }
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::utils::IsAlive for PointerFocusTarget {}
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::input::pointer::PointerTarget<State> for PointerFocusTarget {}
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl smithay::input::touch::TouchTarget<State> for PointerFocusTarget {}
 
 struct State;
 

@@ -1,0 +1,9 @@
+error: #[thin_delegate::register] missing for trait
+ --> tests/ui/fail_external_trait_def_register_missing.rs:3:5
+  |
+3 | /     pub trait AsRef<T: ?Sized> {
+4 | |         /// Converts this type into a shared reference of the (usually inferred) input type.
+5 | |         #[stable(feature = "rust1", since = "1.0.0")]
+6 | |         fn as_ref(&self) -> &T;
+7 | |     }
+  | |_____^

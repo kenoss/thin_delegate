@@ -3,3 +3,11 @@ error: expected `impl <Trait> for <Type>`
   |
 5 | impl Hoge {}
   | ^^^^^^^^^^^^
+
+warning: unused import: `Hoge`
+ --> tests/ui/fail_derive_delegate_for_impl_without_trait.rs:2:8
+  |
+2 | struct Hoge(String);
+  |        ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default

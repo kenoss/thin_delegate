@@ -1,6 +1,6 @@
-// TODO: Make `register()` is usable for trait definition.
-mod private_for_thin_delegate {
-    #[thin_delegate::register(AsRef)]
+#[thin_delegate::external_trait_def]
+mod __external_trait_def {
+    #[thin_delegate::register]
     pub trait AsRef<T: ?Sized> {
         /// Converts this type into a shared reference of the (usually inferred) input type.
         #[stable(feature = "rust1", since = "1.0.0")]
@@ -8,7 +8,7 @@ mod private_for_thin_delegate {
     }
 }
 
-#[thin_delegate::derive_delegate(AsRef<str>)]
+#[thin_delegate::register]
 enum Hoge {
     A(String),
     #[delegate_to(x => &x.0)]
@@ -16,6 +16,9 @@ enum Hoge {
     #[delegate_to(x => &x.1)]
     C((u8, String)),
 }
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl AsRef<str> for Hoge {}
 
 fn main() {
     let hoge = Hoge::A("A".to_string());

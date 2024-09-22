@@ -1,5 +1,0 @@
-error: argument must be a path without generic paramteres, like in `use ...`
- --> tests/ui/fail_register_reject_path_with_generics.rs:3:31
-  |
-3 |     #[thin_delegate::register(AsRef<T>)]
-  |                               ^^^^^^^^

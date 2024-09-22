@@ -1,24 +1,30 @@
+mod attr_remover;
 mod delegate_to_arg;
 #[cfg(not(feature = "unstable_delegate_to"))]
 mod delegate_to_checker;
 mod delegate_to_remover;
+mod derive_delegate_args;
 mod generic_param_replacer;
 mod ident_replacer;
+mod punctuated_parser;
 mod self_replacer;
 
 use crate::delegate_to_arg::DelegateToArg;
+use crate::derive_delegate_args::DeriveDelegateArgs;
 use crate::generic_param_replacer::GenericParamReplacer;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::ops::Deref;
+use syn::parse_quote;
 use syn::spanned::Spanned;
 
-fn macro_name_feed_trait_def_for<T>(trait_name: &T, span: Span) -> syn::Ident
+fn macro_name_feed_trait_def_for<T>(trait_name: &T, span: Span, is_external: bool) -> syn::Ident
 where
     T: std::fmt::Display,
 {
+    let external = if is_external { "external_" } else { "" };
     syn::Ident::new(
-        &format!("__thin_delegate__feed_trait_def_for_{}", trait_name),
+        &format!("__thin_delegate__feed_trait_def_for_{external}{trait_name}"),
         span,
     )
 }
@@ -28,10 +34,7 @@ where
     T: std::fmt::Display,
 {
     syn::Ident::new(
-        &format!(
-            "__thin_delegate__feed_structenum_def_for_{}",
-            structenum_name
-        ),
+        &format!("__thin_delegate__feed_structenum_def_for_{structenum_name}",),
         span,
     )
 }
@@ -136,6 +139,59 @@ impl<'a> FnIngredient<'a> {
 }
 
 #[proc_macro_attribute]
+pub fn external_trait_def(
+    args: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let item: TokenStream = item.into();
+    match external_trait_def_aux(args.into(), item.clone()) {
+        Ok(x) => x.into(),
+        Err(e) => TokenStream::from_iter([e.into_compile_error(), item]).into(),
+    }
+}
+
+fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+    if !args.is_empty() {
+        return Err(syn::Error::new_spanned(args, "arguments must be empty"));
+    }
+
+    let e = syn::Error::new(item.span(), "expected `mod ... { ... }`");
+    let item = syn::parse2::<syn::Item>(item).map_err(|_| e.clone())?;
+    let syn::Item::Mod(mut mod_) = item else {
+        return Err(e);
+    };
+    let Some(ref mut content) = mod_.content else {
+        return Err(e);
+    };
+
+    for item in &mut content.1 {
+        #[allow(clippy::single_match)]
+        match item {
+            syn::Item::Trait(ref mut trait_) => {
+                let attr = parse_quote! {
+                    #[::thin_delegate::internal_is_external_marker]
+                };
+                trait_.attrs.push(attr);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(quote! { #mod_ })
+}
+
+#[proc_macro_attribute]
+pub fn internal_is_external_marker(
+    _args: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let item: TokenStream = item.into();
+    syn::Error::new_spanned(item, "#[thin_delegate::register] missing for trait")
+        .into_compile_error()
+        .into()
+}
+
+#[proc_macro_attribute]
 pub fn register(
     args: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
@@ -158,16 +214,27 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
             "expected `trait ...` or `struct ...` or `enum ...`",
         )
     })?;
+    let is_external = match &item {
+        syn::Item::Trait(trait_) => {
+            let internal_is_external_marker: syn::Attribute = parse_quote! {
+                #[::thin_delegate::internal_is_external_marker]
+            };
+            trait_
+                .attrs
+                .iter()
+                .any(|attr| *attr == internal_is_external_marker)
+        }
+        _ => false,
+    };
     let macro_def = match &item {
         syn::Item::Trait(trait_) => {
-            // TODO: Support external crates.
             let trait_path = syn::Path::from(syn::PathSegment::from(trait_.ident.clone()));
             // Note that `trait_path` here is a kind of dummy. It's just used for creating `TraitData`.
             let trait_data = TraitData::new(trait_, trait_path);
             trait_data.validate()?;
 
             let feed_trait_def_for =
-                macro_name_feed_trait_def_for(&trait_.ident, trait_.ident.span());
+                macro_name_feed_trait_def_for(&trait_.ident, trait_.ident.span(), is_external);
             quote! {
                 macro_rules! #feed_trait_def_for {
                     {
@@ -180,6 +247,7 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
                         }
                     }
                 }
+                pub(crate) use #feed_trait_def_for;
             }
         }
         syn::Item::Struct(structenum) => {
@@ -197,6 +265,7 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
                         }
                     }
                 }
+                pub(crate) use #feed_structenum_def_for;
             }
         }
         syn::Item::Enum(structenum) => {
@@ -214,6 +283,7 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
                         }
                     }
                 }
+                pub(crate) use #feed_structenum_def_for;
             }
         }
         _ => {
@@ -224,17 +294,28 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
         }
     };
 
+    attr_remover::relplace_attr_with_do_nothing_in_item(
+        parse_quote! { ::thin_delegate::internal_is_external_marker },
+        &mut item,
+    );
+
     #[cfg(not(feature = "unstable_delegate_to"))]
     {
         delegate_to_checker::check_non_existence(&mut item)?;
     }
     delegate_to_remover::remove_delegate_to(&mut item);
 
-    Ok(quote! {
-        #item
+    if is_external {
+        Ok(quote! {
+            #macro_def
+        })
+    } else {
+        Ok(quote! {
+            #item
 
-        #macro_def
-    })
+            #macro_def
+        })
+    }
 }
 
 #[proc_macro_attribute]
@@ -251,9 +332,8 @@ pub fn derive_delegate(
 }
 
 fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
-    if !args.is_empty() {
-        return Err(syn::Error::new_spanned(args, "arguments must be empty"));
-    }
+    let args = syn::parse2::<DeriveDelegateArgs>(args)?;
+    let external_trait_def = args.external_trait_def;
 
     let e = syn::Error::new_spanned(&item, "expected `impl <Trait> for <Type>`");
     let item = syn::parse2::<syn::Item>(item).map_err(|_| e.clone())?;
@@ -270,7 +350,15 @@ fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<Toke
     let trait_ident = &trait_path.segments.last().unwrap().ident;
     let structenum_ident = &structenum_path.path.segments.last().unwrap().ident;
 
-    let feed_trait_def_for = macro_name_feed_trait_def_for(&trait_ident, trait_ident.span());
+    let feed_trait_def_for = if let Some(external_trait_def) = &external_trait_def {
+        let feed_trait_def_for =
+            macro_name_feed_trait_def_for(&trait_ident, trait_ident.span(), true);
+        quote! { #external_trait_def::#feed_trait_def_for }
+    } else {
+        let feed_trait_def_for =
+            macro_name_feed_trait_def_for(&trait_ident, trait_ident.span(), false);
+        quote! { #feed_trait_def_for }
+    };
     let feed_structenum_def_for =
         macro_name_feed_structenum_def_for(&structenum_ident, structenum_ident.span());
 

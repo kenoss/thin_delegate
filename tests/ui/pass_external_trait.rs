@@ -1,7 +1,6 @@
-// TODO: Introduce safe mechanism not to leak `STORAGE` for `register()` for external traits.
-
-mod private_for_thin_delegate {
-    #[thin_delegate::register(ToString)]
+#[thin_delegate::external_trait_def]
+mod __external_trait_def {
+    #[thin_delegate::register]
     pub trait ToString {
         /// Converts the given value to a `String`.
         ///
@@ -20,11 +19,14 @@ mod private_for_thin_delegate {
     }
 }
 
-#[thin_delegate::derive_delegate(ToString)]
+#[thin_delegate::register]
 enum Hoge {
     A(String),
     B(char),
 }
+
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+impl ToString for Hoge {}
 
 fn main() {
     let hoge = Hoge::A("a".to_string());
