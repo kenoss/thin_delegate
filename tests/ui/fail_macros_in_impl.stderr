@@ -1,0 +1,16 @@
+error[E0201]: duplicate definitions with name `override_`:
+  --> tests/ui/fail_macros_in_impl.rs:4:5
+   |
+4  |     fn override_(&self) -> String;
+   |     ^^----------------------------
+   |     |
+   |     duplicate definition
+   |     item in trait
+...
+22 |         fn override_(&$self) -> String $body
+   |         ------------------------------------ previous definition here
+...
+26 | #[thin_delegate::derive_delegate]
+   | --------------------------------- in this procedural macro expansion
+   |
+   = note: this error originates in the macro `__thin_delegate__feed_trait_def_of_Hello` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)

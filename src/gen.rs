@@ -3,6 +3,8 @@ use crate::generic_param_replacer::GenericParamReplacer;
 use crate::{ident_replacer, self_replacer};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
+use std::collections::HashSet;
+use syn::parse_quote;
 use syn::spanned::Spanned;
 
 #[derive(Debug)]
@@ -108,6 +110,7 @@ pub(crate) fn gen_impl(
     trait_: &syn::ItemTrait,
     trait_path: &syn::Path,
     structenum: &syn::Item,
+    impl_: syn::ItemImpl,
 ) -> syn::Result<TokenStream> {
     let trait_data = TraitData::new(trait_, trait_path.clone());
 
@@ -116,42 +119,37 @@ pub(crate) fn gen_impl(
         &trait_path.segments.last().unwrap().arguments,
     )?;
 
-    let funcs = trait_data
-        .fn_ingredients()
-        .map(|fn_ingredient| gen_impl_fn(&generic_param_replacer, structenum, fn_ingredient))
-        .collect::<syn::Result<Vec<_>>>()?;
+    let mut func_idents = HashSet::new();
+    for item in &impl_.items {
+        let syn::ImplItem::Fn(func) = item else {
+            continue;
+        };
+        func_idents.insert(func.sig.ident.clone());
+    }
 
-    let item_name = match &structenum {
-        syn::Item::Enum(enum_) => {
-            let ident = &enum_.ident;
-            let generics = &enum_.generics;
-            quote! { #ident #generics }
+    let mut funcs = vec![];
+    for fn_ingredient in trait_data.fn_ingredients() {
+        if func_idents.contains(&fn_ingredient.sig.ident) {
+            continue;
         }
-        syn::Item::Struct(struct_) => {
-            let ident = &struct_.ident;
-            let generics = &struct_.generics;
-            quote! { #ident #generics }
-        }
-        _ => {
-            return Err(syn::Error::new(
-                structenum.span(),
-                "expected `enum ...` or `struct ...`",
-            ));
-        }
-    };
+        funcs.push(gen_impl_fn(
+            &generic_param_replacer,
+            structenum,
+            fn_ingredient,
+        )?);
+    }
 
-    Ok(quote! {
-        impl #trait_path for #item_name {
-            #(#funcs)*
-        }
-    })
+    let mut impl_ = impl_;
+    impl_.items.append(&mut funcs);
+
+    Ok(quote! { #impl_ })
 }
 
 fn gen_impl_fn(
     generic_param_replacer: &GenericParamReplacer,
     item: &syn::Item,
     fn_ingredient: FnIngredient<'_>,
-) -> syn::Result<TokenStream> {
+) -> syn::Result<syn::ImplItem> {
     match item {
         syn::Item::Enum(enum_) => gen_impl_fn_enum(generic_param_replacer, enum_, fn_ingredient),
         syn::Item::Struct(struct_) => {
@@ -168,7 +166,7 @@ fn gen_impl_fn_enum(
     generic_param_replacer: &GenericParamReplacer,
     enum_: &syn::ItemEnum,
     fn_ingredient: FnIngredient<'_>,
-) -> syn::Result<TokenStream> {
+) -> syn::Result<syn::ImplItem> {
     let trait_path = &fn_ingredient.trait_path;
     let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
@@ -245,7 +243,7 @@ fn gen_impl_fn_enum(
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
     let sig = self_replacer::make_self_hygienic_in_signature(sig);
-    Ok(quote! {
+    Ok(parse_quote! {
         #sig {
             match self {
                 #(#match_arms,)*
@@ -258,7 +256,7 @@ fn gen_impl_fn_struct(
     generic_param_replacer: &GenericParamReplacer,
     struct_: &syn::ItemStruct,
     fn_ingredient: FnIngredient<'_>,
-) -> syn::Result<TokenStream> {
+) -> syn::Result<syn::ImplItem> {
     let field_ident = {
         if struct_.fields.len() != 1 {
             return Err(syn::Error::new(
@@ -280,7 +278,7 @@ fn gen_impl_fn_struct(
     let trait_path = &fn_ingredient.trait_path;
     let method_ident = &fn_ingredient.sig.ident;
     let args = fn_ingredient.args();
-    Ok(quote! {
+    Ok(parse_quote! {
         #sig {
             #trait_path::#method_ident(#receiver #(,#args)*)
         }
