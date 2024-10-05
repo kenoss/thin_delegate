@@ -34,8 +34,14 @@ pub(crate) fn make_self_hygienic_in_signature(mut target: syn::Signature) -> syn
 struct Visitor;
 
 impl VisitMut for Visitor {
-    // We only replaces `self` in receiver position, as we need it for `syn::Signature`.
     fn visit_receiver_mut(&mut self, node: &mut syn::Receiver) {
         node.self_token = syn::Token![self](Span::call_site());
+    }
+
+    fn visit_expr_path_mut(&mut self, node: &mut syn::ExprPath) {
+        if node.path.is_ident("self") {
+            let ident = syn::Ident::new("self", Span::call_site());
+            node.path = syn::Path::from(syn::PathSegment::from(ident));
+        }
     }
 }
