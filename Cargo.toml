@@ -16,6 +16,7 @@ proc-macro = true
 
 [features]
 default = []
+test_smithay = []
 
 [[test]]
 name = "tests"

@@ -11,7 +11,10 @@ run *ARGS:
   cargo run {{ARGS}}
 
 test *ARGS:
+  cargo test --features test_smithay {{ARGS}}
+
+test-ci *ARGS:
   cargo test {{ARGS}}
 
 nextest-run *ARGS:
-  cargo nextest run {{ARGS}}
+  cargo nextest run --features test_smithay {{ARGS}}

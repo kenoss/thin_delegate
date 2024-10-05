@@ -23,7 +23,7 @@ jobs:
         crate: just
         version: '1.34.0'
 
-    - run: just test
+    - run: just test-ci
 
   check-strict:
     runs-on: ubuntu-latest
