@@ -4,7 +4,6 @@ mod derive_delegate_args;
 mod fn_call_replacer;
 mod gen;
 mod generic_param_replacer;
-mod punctuated_parser;
 mod self_replacer;
 
 use crate::derive_delegate_args::DeriveDelegateArgs;

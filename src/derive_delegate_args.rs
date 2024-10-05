@@ -1,4 +1,3 @@
-use crate::punctuated_parser::PunctuatedParser;
 use proc_macro2::{Span, TokenStream};
 use quote::TokenStreamExt;
 use syn::parse::Parse;
@@ -130,8 +129,9 @@ impl Parse for DeriveDelegateArgs {
             scheme: None,
         };
 
-        let args = PunctuatedParser::<ParsableArg, syn::Token![,]>::parse(input)?;
-        for arg in args.into_inner() {
+        let args =
+            syn::punctuated::Punctuated::<ParsableArg, syn::Token![,]>::parse_terminated(input)?;
+        for arg in args {
             match arg {
                 ParsableArg::ExternalTraitDef { path, .. } => {
                     this.external_trait_def = Some(path);
