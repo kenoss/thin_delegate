@@ -1,6 +1,6 @@
 [package]
 name = "thin_delegate"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["keno (Ken Okada) <keno.ss57@gmail.com>"]
 categories = ["rust-patterns"]
