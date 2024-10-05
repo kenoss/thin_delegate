@@ -94,7 +94,7 @@ pub(crate) fn exec_internal_derive_delegate(
     // -> __thin_delegate__trampoline1!
     // -> #feed_structenum_def_of!
     // -> __thin_delegate__trampoline2!
-    // -> #[::thin_delegate::internal_derive_delegate]
+    // -> #[::thin_delegate::__internal__derive_delegate]
     quote! {
         macro_rules! __thin_delegate__trampoline2 {
             {
@@ -102,7 +102,7 @@ pub(crate) fn exec_internal_derive_delegate(
                 @TRAIT_DEF { $trait_def:item },
                 @STRUCTENUM_DEF { $structenum_def:item },
             } => {
-                #[::thin_delegate::internal_derive_delegate(#args)]
+                #[::thin_delegate::__internal__derive_delegate(#args)]
                 mod __thin_delegate__change_this_name {
                     $trait_def
 

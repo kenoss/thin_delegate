@@ -11,7 +11,7 @@ pub(crate) fn make_self_hygienic_in_signature(mut target: syn::Signature) -> syn
 ///
 /// `thin_delegate` transfers definition of a trait and a struct/enum to
 /// `#[thin_delegate::derive_delegate]` by using declarative macro.
-/// `#[thin_delegate::internal_derive_delegate]` processes a token stream in the macro context.
+/// `#[thin_delegate::__internal__derive_delegate]` processes a token stream in the macro context.
 /// If we use `self` in this token stream as is, an error like the following arise:
 ///
 /// ```ignore
@@ -24,7 +24,7 @@ pub(crate) fn make_self_hygienic_in_signature(mut target: syn::Signature) -> syn
 /// 24 | #[thin_delegate::derive_delegate]
 ///    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `self` value is a keyword only available in methods with a `self` parameter
 ///    |
-///    = note: this error originates in the attribute macro `::thin_delegate::internal_derive_delegate` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
+///    = note: this error originates in the attribute macro `::thin_delegate::__internal__derive_delegate` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
 /// For more information about this error, try `rustc --explain E0424`.
 /// ```
 ///

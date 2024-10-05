@@ -46,7 +46,7 @@ fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<T
         match item {
             syn::Item::Trait(ref mut trait_) => {
                 let attr = parse_quote! {
-                    #[::thin_delegate::internal_is_external_marker]
+                    #[::thin_delegate::__internal__is_external_marker]
                 };
                 trait_.attrs.push(attr);
             }
@@ -57,8 +57,11 @@ fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<T
     Ok(quote! { #mod_ })
 }
 
+/// Do not use. This is only used from `thin_delegate` crate internal.
+#[doc(hidden)]
+#[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn internal_is_external_marker(
+pub fn __internal__is_external_marker(
     _args: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
@@ -93,13 +96,14 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
     })?;
     let is_external = match &item {
         syn::Item::Trait(trait_) => {
-            let internal_is_external_marker: syn::Attribute = parse_quote! {
-                #[::thin_delegate::internal_is_external_marker]
+            #[allow(non_snake_case)]
+            let __internal__is_external_marker: syn::Attribute = parse_quote! {
+                #[::thin_delegate::__internal__is_external_marker]
             };
             trait_
                 .attrs
                 .iter()
-                .any(|attr| *attr == internal_is_external_marker)
+                .any(|attr| *attr == __internal__is_external_marker)
         }
         _ => false,
     };
@@ -136,7 +140,7 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
     };
 
     attr_remover::relplace_attr_with_do_nothing_in_item(
-        parse_quote! { ::thin_delegate::internal_is_external_marker },
+        parse_quote! { ::thin_delegate::__internal__is_external_marker },
         &mut item,
     );
 
@@ -195,8 +199,11 @@ fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<Toke
     ))
 }
 
+/// Do not use. This is only used from `thin_delegate` crate internal.
+#[doc(hidden)]
+#[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn internal_derive_delegate(
+pub fn __internal__derive_delegate(
     args: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
