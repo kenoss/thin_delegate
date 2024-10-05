@@ -1,14 +1,9 @@
 mod attr_remover;
 mod decl_macro;
-mod delegate_to_arg;
-#[cfg(not(feature = "unstable_delegate_to"))]
-mod delegate_to_checker;
-mod delegate_to_remover;
 mod derive_delegate_args;
 mod fn_call_replacer;
 mod gen;
 mod generic_param_replacer;
-mod ident_replacer;
 mod punctuated_parser;
 mod self_replacer;
 
@@ -144,12 +139,6 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
         parse_quote! { ::thin_delegate::internal_is_external_marker },
         &mut item,
     );
-
-    #[cfg(not(feature = "unstable_delegate_to"))]
-    {
-        delegate_to_checker::check_non_existence(&mut item)?;
-    }
-    delegate_to_remover::remove_delegate_to(&mut item);
 
     if is_external {
         Ok(quote! {
@@ -608,34 +597,6 @@ mod tests {
             impl Hello<'p, str> for Hoge<'p> {
                 fn hello(&self) -> &'p str {
                     Hello::hello(&self.0)
-                }
-            }
-        },
-    }
-
-    test_internal_derive_delegate! {
-        custom_receiver,
-        quote! {},
-        quote! {
-            pub trait AsRef<T: ?Sized> {
-                /// Converts this type into a shared reference of the (usually inferred) input type.
-                #[stable(feature = "rust1", since = "1.0.0")]
-                fn as_ref(&self) -> &T;
-            }
-
-            enum Hoge {
-                #[delegate_to(x => &x.0)]
-                A((String, u8)),
-            }
-
-            impl AsRef<str> for Hoge {}
-        },
-        quote! {
-            impl AsRef<str> for Hoge {
-                fn as_ref(&self) -> &str {
-                    match self {
-                        Self::A(x) => AsRef::as_ref(&x.0),
-                    }
                 }
             }
         },

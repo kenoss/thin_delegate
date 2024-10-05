@@ -16,7 +16,6 @@ proc-macro = true
 
 [features]
 default = []
-unstable_delegate_to = []
 
 [[test]]
 name = "tests"

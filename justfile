@@ -11,7 +11,7 @@ run *ARGS:
   cargo run {{ARGS}}
 
 test *ARGS:
-  cargo test --features unstable_delegate_to {{ARGS}}
+  cargo test {{ARGS}}
 
 nextest-run *ARGS:
-  cargo nextest run --features unstable_delegate_to {{ARGS}}
+  cargo nextest run {{ARGS}}

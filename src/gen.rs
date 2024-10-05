@@ -1,9 +1,8 @@
-use crate::delegate_to_arg::DelegateToArg;
 use crate::derive_delegate_args::DeriveDelegateArgs;
 use crate::generic_param_replacer::GenericParamReplacer;
-use crate::{fn_call_replacer, ident_replacer, self_replacer};
+use crate::{fn_call_replacer, self_replacer};
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::quote;
 use std::collections::HashSet;
 use syn::parse_quote;
 use syn::spanned::Spanned;
@@ -221,24 +220,6 @@ fn gen_impl_fn_enum(
         .variants
         .iter()
         .map(|variant| {
-            // Note that we'll remove `#[delegate_to(...)]` attribute by `delegate_to_remover::remove_delegate_to()`.
-            let mut delegate_to_arg = None;
-            for attr in &variant.attrs {
-                match &attr.meta {
-                    syn::Meta::List(meta_list) if meta_list.path.is_ident("delegate_to") => {
-                        if delegate_to_arg.is_some() {
-                            return Err(syn::Error::new_spanned(
-                                attr,
-                                "#[delegate_to(...)] can appear at most once",
-                            ));
-                        }
-
-                        delegate_to_arg = Some(syn::parse2::<DelegateToArg>(meta_list.tokens.clone())?);
-                    }
-                    _ => {},
-                }
-            }
-
             let variant_ident = &variant.ident;
             match &variant.fields {
                 syn::Fields::Named(fields) => {
@@ -250,14 +231,8 @@ fn gen_impl_fn_enum(
                     }
 
                     let ident = fields.named[0].ident.as_ref().unwrap();
-                    let receiver = if let Some(delegate_to_arg) = delegate_to_arg {
-                        ident_replacer::replace_ident_in_expr(delegate_to_arg.ident, ident.clone(), delegate_to_arg.expr).to_token_stream()
-                    } else {
-                        ident.to_token_stream()
-                    };
-
                     Ok(quote! {
-                        Self::#variant_ident { #ident } => #trait_path::#method_ident(#receiver #(,#args)*)
+                        Self::#variant_ident { #ident } => #trait_path::#method_ident(#ident #(,#args)*)
                     })
                 }
                 syn::Fields::Unnamed(fields) => {
@@ -269,13 +244,8 @@ fn gen_impl_fn_enum(
                     }
 
                     let ident = syn::Ident::new("x", Span::call_site());
-                    let receiver = if let Some(delegate_to_arg) = delegate_to_arg {
-                        ident_replacer::replace_ident_in_expr(delegate_to_arg.ident, ident.clone(), delegate_to_arg.expr).to_token_stream()
-                    } else {
-                        ident.to_token_stream()
-                    };
                     Ok(quote! {
-                        Self::#variant_ident(x) => #trait_path::#method_ident(#receiver #(,#args)*)
+                        Self::#variant_ident(x) => #trait_path::#method_ident(#ident #(,#args)*)
                     })
                 }
                 syn::Fields::Unit => {
