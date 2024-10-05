@@ -14,7 +14,7 @@ pub(crate) fn make_self_hygienic_in_signature(mut target: syn::Signature) -> syn
 /// `#[thin_delegate::__internal__derive_delegate]` processes a token stream in the macro context.
 /// If we use `self` in this token stream as is, an error like the following arise:
 ///
-/// ```ignore
+/// ```text
 /// error[E0424]: expected value, found module `self`
 ///   --> src/main.rs:24:1
 ///    |
