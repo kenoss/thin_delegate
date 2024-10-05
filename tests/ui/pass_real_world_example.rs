@@ -1,7 +1,7 @@
 // Compare with https://github.com/Smithay/smithay/blob/8e49b9b/anvil/src/focus.rs
 
 use smithay::backend::input::KeyState;
-use smithay::input::keyboard::{KeyboardTarget, KeysymHandle, ModifiersState};
+use smithay::input::keyboard::{KeysymHandle, ModifiersState};
 use smithay::input::pointer::{AxisFrame, ButtonEvent, MotionEvent, RelativeMotionEvent};
 use smithay::input::pointer::{
     GestureHoldBeginEvent, GestureHoldEndEvent, GesturePinchBeginEvent, GesturePinchEndEvent,
@@ -170,176 +170,32 @@ struct Window(smithay::desktop::Window);
 #[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
 impl smithay::utils::IsAlive for Window {}
 
-impl smithay::input::keyboard::KeyboardTarget<State> for Window {
-    fn enter(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        keys: Vec<KeysymHandle<'_>>,
-        serial: Serial,
-    ) {
-        match self.0.underlying_surface() {
-            smithay::desktop::WindowSurface::Wayland(w) => {
-                KeyboardTarget::enter(w.wl_surface(), seat, data, keys, serial)
-            }
-
-            smithay::desktop::WindowSurface::X11(s) => {
-                KeyboardTarget::enter(s, seat, data, keys, serial)
-            }
-        }
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def, scheme = |f| {
+    match self.0.underlying_surface() {
+        smithay::desktop::WindowSurface::Wayland(s) => f(s.wl_surface()),
+        smithay::desktop::WindowSurface::X11(s) => f(s),
     }
-
-    fn leave(&self, seat: &Seat<State>, data: &mut State, serial: Serial) {
-        match self.0.underlying_surface() {
-            smithay::desktop::WindowSurface::Wayland(w) => {
-                KeyboardTarget::leave(w.wl_surface(), seat, data, serial)
-            }
-
-            smithay::desktop::WindowSurface::X11(s) => KeyboardTarget::leave(s, seat, data, serial),
-        }
-    }
-
-    fn key(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        key: KeysymHandle<'_>,
-        state: KeyState,
-        serial: Serial,
-        time: u32,
-    ) {
-        match self.0.underlying_surface() {
-            smithay::desktop::WindowSurface::Wayland(w) => {
-                KeyboardTarget::key(w.wl_surface(), seat, data, key, state, serial, time)
-            }
-
-            smithay::desktop::WindowSurface::X11(s) => {
-                KeyboardTarget::key(s, seat, data, key, state, serial, time)
-            }
-        }
-    }
-
-    fn modifiers(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        modifiers: ModifiersState,
-        serial: Serial,
-    ) {
-        match self.0.underlying_surface() {
-            smithay::desktop::WindowSurface::Wayland(w) => {
-                KeyboardTarget::modifiers(w.wl_surface(), seat, data, modifiers, serial)
-            }
-
-            smithay::desktop::WindowSurface::X11(s) => {
-                KeyboardTarget::modifiers(s, seat, data, modifiers, serial)
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[thin_delegate::register]
-struct LayerSurface(smithay::desktop::LayerSurface);
-
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
-impl smithay::utils::IsAlive for LayerSurface {}
-
-impl smithay::input::keyboard::KeyboardTarget<State> for LayerSurface {
-    fn enter(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        keys: Vec<KeysymHandle<'_>>,
-        serial: Serial,
-    ) {
-        KeyboardTarget::enter(self.0.wl_surface(), seat, data, keys, serial)
-    }
-
-    fn leave(&self, seat: &Seat<State>, data: &mut State, serial: Serial) {
-        KeyboardTarget::leave(self.0.wl_surface(), seat, data, serial)
-    }
-
-    fn key(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        key: KeysymHandle<'_>,
-        state: KeyState,
-        serial: Serial,
-        time: u32,
-    ) {
-        KeyboardTarget::key(self.0.wl_surface(), seat, data, key, state, serial, time)
-    }
-
-    fn modifiers(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        modifiers: ModifiersState,
-        serial: Serial,
-    ) {
-        KeyboardTarget::modifiers(self.0.wl_surface(), seat, data, modifiers, serial)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[thin_delegate::register]
-struct PopupKind(smithay::desktop::PopupKind);
-
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
-impl smithay::utils::IsAlive for PopupKind {}
-
-impl smithay::input::keyboard::KeyboardTarget<State> for PopupKind {
-    fn enter(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        keys: Vec<KeysymHandle<'_>>,
-        serial: Serial,
-    ) {
-        KeyboardTarget::enter(self.0.wl_surface(), seat, data, keys, serial)
-    }
-
-    fn leave(&self, seat: &Seat<State>, data: &mut State, serial: Serial) {
-        KeyboardTarget::leave(self.0.wl_surface(), seat, data, serial)
-    }
-
-    fn key(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        key: KeysymHandle<'_>,
-        state: KeyState,
-        serial: Serial,
-        time: u32,
-    ) {
-        KeyboardTarget::key(self.0.wl_surface(), seat, data, key, state, serial, time)
-    }
-
-    fn modifiers(
-        &self,
-        seat: &Seat<State>,
-        data: &mut State,
-        modifiers: ModifiersState,
-        serial: Serial,
-    ) {
-        KeyboardTarget::modifiers(self.0.wl_surface(), seat, data, modifiers, serial)
-    }
-}
+})]
+impl smithay::input::keyboard::KeyboardTarget<State> for Window {}
 
 #[derive(Debug, Clone, PartialEq)]
 #[thin_delegate::register]
 enum KeyboardFocusTarget {
     Window(Window),
-    LayerSurface(LayerSurface),
-    Popup(PopupKind),
+    LayerSurface(smithay::desktop::LayerSurface),
+    Popup(smithay::desktop::PopupKind),
 }
 
 #[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
 impl smithay::utils::IsAlive for KeyboardFocusTarget {}
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def, scheme = |f| {
+    match self {
+        Self::Window(w) => f(w),
+        Self::LayerSurface(s) => f(s.wl_surface()),
+        Self::Popup(p) => f(p.wl_surface()),
+    }
+})]
 impl smithay::input::keyboard::KeyboardTarget<State> for KeyboardFocusTarget {}
 
 #[derive(Debug, Clone, PartialEq)]

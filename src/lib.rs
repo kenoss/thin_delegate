@@ -5,6 +5,7 @@ mod delegate_to_arg;
 mod delegate_to_checker;
 mod delegate_to_remover;
 mod derive_delegate_args;
+mod fn_call_replacer;
 mod gen;
 mod generic_param_replacer;
 mod ident_replacer;
@@ -177,8 +178,9 @@ pub fn derive_delegate(
 }
 
 fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+    let args_as_tokenstream = args.clone();
     let args = syn::parse2::<DeriveDelegateArgs>(args)?;
-    let external_trait_def = args.external_trait_def;
+    args.validate()?;
 
     let e = syn::Error::new_spanned(&item, "expected `impl <Trait> for <Type>`");
     let item = syn::parse2::<syn::Item>(item).map_err(|_| e.clone())?;
@@ -198,7 +200,8 @@ fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<Toke
     Ok(decl_macro::exec_internal_derive_delegate(
         trait_ident,
         structenum_ident,
-        &external_trait_def,
+        &args.external_trait_def,
+        args_as_tokenstream,
         &impl_,
     ))
 }
@@ -217,9 +220,8 @@ pub fn internal_derive_delegate(
 fn internal_derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     // We'll use panic here as it is only used by this crate.
 
-    if !args.is_empty() {
-        panic!();
-    }
+    let args = syn::parse2::<DeriveDelegateArgs>(args)?;
+    args.validate()?;
 
     let item = syn::parse2::<syn::Item>(item.clone()).unwrap();
     let syn::Item::Mod(mod_) = item else {
@@ -239,7 +241,7 @@ fn internal_derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Re
         panic!()
     };
 
-    gen::gen_impl(&trait_, &trait_path.clone(), &structenum, impl_)
+    gen::gen_impl(&args, &trait_, &trait_path.clone(), &structenum, impl_)
 }
 
 #[cfg(test)]
@@ -248,9 +250,10 @@ mod tests {
 
     macro_rules! compare_result {
         ($got:expr, $expected:expr) => {
+            let got: syn::Result<TokenStream> = $got;
             let expected: syn::Result<TokenStream> = $expected;
             assert_eq!(
-                ($got).map(|x| x.to_string()).map_err(|e| e.to_string()),
+                got.map(|x| x.to_string()).map_err(|e| e.to_string()),
                 expected.map(|x| x.to_string()).map_err(|e| e.to_string())
             );
         };
@@ -259,12 +262,13 @@ mod tests {
     macro_rules! test_internal_derive_delegate {
         (
             $test_name:ident,
+            $args:expr,
             $input:expr,
             $expected:expr,
         ) => {
             #[test]
             fn $test_name() -> syn::Result<()> {
-                let args = TokenStream::new();
+                let args: TokenStream = $args;
                 let input: TokenStream = $input;
                 let expected: TokenStream = $expected;
 
@@ -282,6 +286,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         r#enum,
+        quote! {},
         quote! {
             trait Hello {
                 fn hello(&self) -> String;
@@ -310,6 +315,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         enum_ref_mut_receiver,
+        quote! {},
         quote! {
             pub trait Hello {
                 fn hello(&mut self) -> String;
@@ -338,6 +344,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         enum_consume_receiver,
+        quote! {},
         quote! {
             trait Hello {
                 fn hello(self) -> String;
@@ -366,6 +373,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         struct_with_named_field,
+        quote! {},
         quote! {
             trait Hello {
                 fn hello(&self) -> String;
@@ -388,6 +396,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         struct_with_unnamed_field,
+        quote! {},
         quote! {
             trait Hello {
                 fn hello(&self) -> String;
@@ -408,6 +417,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         struct_ref_mut_receiver,
+        quote! {},
         quote! {
             trait Hello {
                 fn hello(&mut self) -> String;
@@ -430,6 +440,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         struct_consume_receiver,
+        quote! {},
         quote! {
             trait Hello {
                 fn hello(self) -> String;
@@ -452,6 +463,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         method_with_args,
+        quote! {},
         quote! {
             trait Hello {
                 fn hello(&self, prefix: &str) -> String;
@@ -478,6 +490,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         super_trait,
+        quote! {},
         quote! {
             trait Hello: ToString {
                 fn hello(&self) -> String;
@@ -504,6 +517,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         generics_enum,
+        quote! {},
         quote! {
             pub trait AsRef<T: ?Sized> {
                 /// Converts this type into a shared reference of the (usually inferred) input type.
@@ -532,6 +546,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         generics_struct,
+        quote! {},
         quote! {
             pub trait AsRef<T: ?Sized> {
                 /// Converts this type into a shared reference of the (usually inferred) input type.
@@ -556,6 +571,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         generics_specilize_complex,
+        quote! {},
         quote! {
             pub trait AsRef<T: ?Sized> {
                 /// Converts this type into a shared reference of the (usually inferred) input type.
@@ -578,6 +594,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         generics_specilize_lifetime,
+        quote! {},
         quote! {
             pub trait Hello<'a, T> {
                 fn hello(&self) -> &'a T;
@@ -598,6 +615,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         custom_receiver,
+        quote! {},
         quote! {
             pub trait AsRef<T: ?Sized> {
                 /// Converts this type into a shared reference of the (usually inferred) input type.
@@ -625,6 +643,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         items_in_impl,
+        quote! {},
         quote! {
             trait Hello {
                 type Return;
@@ -678,6 +697,7 @@ mod tests {
 
     test_internal_derive_delegate! {
         macro_in_impl,
+        quote! {},
         quote! {
             trait Hello {
                 fn filled(&self) -> String;
@@ -707,6 +727,65 @@ mod tests {
 
                 fn override_(&self) -> String {
                     Hello::override_(&self.0)
+                }
+            }
+        },
+    }
+
+    test_internal_derive_delegate! {
+        scheme,
+        quote! {
+            scheme = |f| f(&self.key())
+        },
+        quote! {
+            pub trait Hello {
+                fn hello(&self, prefix: &str) -> String;
+            }
+
+            struct Hoge(String);
+
+            impl Hello for Hoge {}
+        },
+        quote! {
+            impl Hello for Hoge {
+                fn hello(&self, prefix: &str) -> String {
+                    Hello::hello(&self.key(), prefix)
+                }
+            }
+        },
+    }
+
+    test_internal_derive_delegate! {
+        scheme_enum,
+        quote! {
+            scheme = |f| {
+                match self {
+                    Self::A(s) => f(&format!("{s}{s}")),
+                    Self::B(c) => f(c),
+                }
+            }
+        },
+        quote! {
+            pub trait Hello {
+                fn hello(&self, prefix: &str) -> String;
+            }
+
+            enum Hoge {
+                A(String),
+                B(char),
+            }
+
+            impl Hello for Hoge {}
+        },
+        quote! {
+            impl Hello for Hoge {
+                fn hello(&self, prefix: &str) -> String {
+                    {
+                        match self {
+                            Self::A(s) => Hello::hello(&format!("{s}{s}"), prefix),
+                            Self::B(c) => Hello::hello(c, prefix),
+                        }
+                    }
                 }
             }
         },

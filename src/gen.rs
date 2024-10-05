@@ -1,6 +1,7 @@
 use crate::delegate_to_arg::DelegateToArg;
+use crate::derive_delegate_args::DeriveDelegateArgs;
 use crate::generic_param_replacer::GenericParamReplacer;
-use crate::{ident_replacer, self_replacer};
+use crate::{fn_call_replacer, ident_replacer, self_replacer};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::collections::HashSet;
@@ -107,6 +108,7 @@ impl<'a> FnIngredient<'a> {
 }
 
 pub(crate) fn gen_impl(
+    args: &DeriveDelegateArgs,
     trait_: &syn::ItemTrait,
     trait_path: &syn::Path,
     structenum: &syn::Item,
@@ -133,6 +135,7 @@ pub(crate) fn gen_impl(
             continue;
         }
         funcs.push(gen_impl_fn(
+            args,
             &generic_param_replacer,
             structenum,
             fn_ingredient,
@@ -146,14 +149,19 @@ pub(crate) fn gen_impl(
 }
 
 fn gen_impl_fn(
+    args: &DeriveDelegateArgs,
     generic_param_replacer: &GenericParamReplacer,
     item: &syn::Item,
     fn_ingredient: FnIngredient<'_>,
 ) -> syn::Result<syn::ImplItem> {
+    if let Some(impl_) = gen_impl_fn_scheme(args, generic_param_replacer, &fn_ingredient) {
+        return Ok(impl_);
+    }
+
     match item {
-        syn::Item::Enum(enum_) => gen_impl_fn_enum(generic_param_replacer, enum_, fn_ingredient),
+        syn::Item::Enum(enum_) => gen_impl_fn_enum(generic_param_replacer, enum_, &fn_ingredient),
         syn::Item::Struct(struct_) => {
-            gen_impl_fn_struct(generic_param_replacer, struct_, fn_ingredient)
+            gen_impl_fn_struct(generic_param_replacer, struct_, &fn_ingredient)
         }
         _ => Err(syn::Error::new(
             item.span(),
@@ -162,10 +170,49 @@ fn gen_impl_fn(
     }
 }
 
+fn gen_impl_fn_scheme(
+    args: &DeriveDelegateArgs,
+    generic_param_replacer: &GenericParamReplacer,
+    fn_ingredient: &FnIngredient<'_>,
+) -> Option<syn::ImplItem> {
+    let (arg, body) = args.scheme_arg_and_body()?;
+
+    let trait_path = &fn_ingredient.trait_path;
+    let method_ident = &fn_ingredient.sig.ident;
+    let path = parse_quote! { #trait_path::#method_ident };
+
+    let non_receiver_args = fn_ingredient
+        .args()
+        .iter()
+        .map(|x| {
+            let path = syn::Path::from(syn::PathSegment::from(x.ident.clone()));
+            syn::Expr::from(syn::ExprPath {
+                attrs: vec![],
+                qself: None,
+                path,
+            })
+        })
+        .collect();
+    let body = fn_call_replacer::replace_fn_call_in_expr(
+        arg.clone(),
+        path,
+        non_receiver_args,
+        body.clone(),
+    );
+
+    let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
+    let sig = self_replacer::make_self_hygienic_in_signature(sig);
+    Some(parse_quote! {
+        #sig {
+            #body
+        }
+    })
+}
+
 fn gen_impl_fn_enum(
     generic_param_replacer: &GenericParamReplacer,
     enum_: &syn::ItemEnum,
-    fn_ingredient: FnIngredient<'_>,
+    fn_ingredient: &FnIngredient<'_>,
 ) -> syn::Result<syn::ImplItem> {
     let trait_path = &fn_ingredient.trait_path;
     let method_ident = &fn_ingredient.sig.ident;
@@ -255,7 +302,7 @@ fn gen_impl_fn_enum(
 fn gen_impl_fn_struct(
     generic_param_replacer: &GenericParamReplacer,
     struct_: &syn::ItemStruct,
-    fn_ingredient: FnIngredient<'_>,
+    fn_ingredient: &FnIngredient<'_>,
 ) -> syn::Result<syn::ImplItem> {
     let field_ident = {
         if struct_.fields.len() != 1 {

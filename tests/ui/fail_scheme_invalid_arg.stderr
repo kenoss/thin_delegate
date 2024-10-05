@@ -1,0 +1,17 @@
+error: arg of scheme can't have `@ SUBPATTERN`
+ --> tests/ui/fail_scheme_invalid_arg.rs:1:46
+  |
+1 | #[thin_delegate::derive_delegate(scheme = |f @ Fuga| f(&self.key()))]
+  |                                              ^^^^^^
+
+error[E0405]: cannot find trait `Hello` in this scope
+ --> tests/ui/fail_scheme_invalid_arg.rs:2:6
+  |
+2 | impl Hello for Hoge {}
+  |      ^^^^^ not found in this scope
+
+error[E0412]: cannot find type `Hoge` in this scope
+ --> tests/ui/fail_scheme_invalid_arg.rs:2:16
+  |
+2 | impl Hello for Hoge {}
+  |                ^^^^ not found in this scope

@@ -73,6 +73,7 @@ pub(crate) fn exec_internal_derive_delegate(
     trait_ident: &syn::Ident,
     structenum_ident: &syn::Ident,
     external_trait_def: &Option<syn::Path>,
+    args: TokenStream,
     impl_: &syn::ItemImpl,
 ) -> TokenStream {
     let feed_trait_def_of = if let Some(external_trait_def) = &external_trait_def {
@@ -102,7 +103,7 @@ pub(crate) fn exec_internal_derive_delegate(
                 @STRUCTENUM_DEF { $structenum_def:item },
             } => {
                 // TODO: Add a test that uses `#[thin_delegate::derive_delegate]` twice.
-                #[::thin_delegate::internal_derive_delegate]
+                #[::thin_delegate::internal_derive_delegate(#args)]
                 mod __thin_delegate__change_this_name {
                     $trait_def
 
