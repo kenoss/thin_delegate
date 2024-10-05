@@ -102,7 +102,6 @@ pub(crate) fn exec_internal_derive_delegate(
                 @TRAIT_DEF { $trait_def:item },
                 @STRUCTENUM_DEF { $structenum_def:item },
             } => {
-                // TODO: Add a test that uses `#[thin_delegate::derive_delegate]` twice.
                 #[::thin_delegate::internal_derive_delegate(#args)]
                 mod __thin_delegate__change_this_name {
                     $trait_def
