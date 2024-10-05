@@ -4,6 +4,7 @@ use quote::ToTokens;
 use std::collections::HashMap;
 use syn::visit_mut::VisitMut;
 
+/// Replaces generic parameters by generic arguments.
 pub(crate) struct GenericParamReplacer {
     lifetimes: HashMap<syn::Lifetime, syn::Lifetime>,
     types: HashMap<syn::TypePath, syn::Type>,

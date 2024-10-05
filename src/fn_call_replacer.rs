@@ -1,6 +1,6 @@
 use syn::visit_mut::VisitMut;
 
-/// Replace function calls `orig_func(receiver)` in `target` with
+/// Replaces function calls `orig_func(receiver)` in `target` with
 /// `subst_func(receiver, subst_non_receiver_args)`.
 pub(crate) fn replace_fn_call_in_expr(
     orig_func: syn::Ident,
