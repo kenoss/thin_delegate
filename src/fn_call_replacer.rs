@@ -133,4 +133,26 @@ mod tests {
             }
         },
     }
+
+    // It doesn't care about name conflict.
+    //
+    // See also tests/ui/pass_scheme_name_conflict.rs
+    test_replace_fn_call_in_expr! {
+        name_conflict,
+        quote! { f },
+        quote! { Hello::hello },
+        quote! { a },
+        quote! {
+            match self {
+                Self::A(a) => f(&format!("{a}{a}")),
+                Self::B(b) => f(b),
+            }
+        },
+        quote! {
+            match self {
+                Self::A(a) => Hello::hello(&format!("{a}{a}"), a),
+                Self::B(b) => Hello::hello(b, a),
+            }
+        },
+    }
 }
