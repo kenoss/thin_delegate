@@ -1,3 +1,15 @@
+//! Auto implementation of trivial delegation to inner types.
+//!
+//! ## Status
+//!
+//! v0.0.1, alpha
+//!
+//! Development phase. The author is trying to use it.
+//!
+//! ## TODO
+//!
+//! - [ ] Documentation
+
 mod attr_remover;
 mod decl_macro;
 mod derive_delegate_args;

@@ -2,6 +2,16 @@
 
 Auto implementation of trivial delegation to inner types.
 
+## Status
+
+v0.0.1, alpha
+
+Development phase. The author is trying to use it.
+
+## TODO
+
+- [ ] Documentation
+
 ## License
 
 This repository is distributed under the terms of both the MIT license and the
