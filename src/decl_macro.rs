@@ -43,6 +43,7 @@ pub(crate) fn define_macro_feed_trait_def_of(
                 }
             }
         }
+        #[allow(unused_imports)]
         pub(crate) use #feed_trait_def_of;
     }
 }
@@ -65,6 +66,7 @@ pub(crate) fn define_macro_feed_structenum_def_of(
                 }
             }
         }
+        #[allow(unused_imports)]
         pub(crate) use #feed_structenum_def_of;
     }
 }

@@ -6,11 +6,3 @@ error: cannot find macro `__thin_delegate__feed_trait_def_of_ToString` in this s
 ...
 8 | impl ToString for Hoge {}
   |      ^^^^^^^^ help: a macro with a similar name exists: `__thin_delegate__feed_structenum_def_of_Hoge`
-
-warning: unused import: `Hoge`
- --> tests/ui/fail_register_for_trait_missing.rs:2:6
-  |
-2 | enum Hoge {
-  |      ^^^^
-  |
-  = note: `#[warn(unused_imports)]` on by default
