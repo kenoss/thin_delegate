@@ -15,9 +15,7 @@ pub(crate) struct TraitData {
 }
 
 impl TraitData {
-    pub fn new(trait_: &syn::ItemTrait, mut trait_path: syn::Path) -> Self {
-        trait_path.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
-
+    pub fn new(trait_: &syn::ItemTrait, trait_path: syn::Path) -> Self {
         let sigs = trait_
             .items
             .iter()
@@ -87,6 +85,22 @@ impl<'a> FnIngredient<'a> {
             (None, None) => quote! {},
         };
         Ok(ret)
+    }
+
+    pub fn func_path(&self) -> syn::Path {
+        let mut trait_path = self.trait_path.clone();
+        let generic_args = trait_path.segments.last_mut().unwrap().arguments.clone();
+        trait_path.segments.last_mut().unwrap().arguments = syn::PathArguments::None;
+        let method_ident = &self.sig.ident;
+        match generic_args {
+            syn::PathArguments::None => parse_quote! { #trait_path::#method_ident },
+            syn::PathArguments::AngleBracketed(_) => {
+                parse_quote! { #trait_path::#generic_args::#method_ident }
+            }
+            syn::PathArguments::Parenthesized(_) => {
+                panic!("syn::PathArguments::Parenthesized must not appear at `impl args::of::Here__ for ...`");
+            }
+        }
     }
 
     pub fn args(&self) -> Vec<&syn::PatIdent> {
@@ -176,10 +190,6 @@ fn gen_impl_fn_scheme(
 ) -> Option<syn::ImplItem> {
     let (arg, body) = args.scheme_arg_and_body()?;
 
-    let trait_path = &fn_ingredient.trait_path;
-    let method_ident = &fn_ingredient.sig.ident;
-    let path = parse_quote! { #trait_path::#method_ident };
-
     let non_receiver_args = fn_ingredient
         .args()
         .iter()
@@ -194,7 +204,7 @@ fn gen_impl_fn_scheme(
         .collect();
     let body = fn_call_replacer::replace_fn_call_in_expr(
         arg.clone(),
-        path,
+        fn_ingredient.func_path(),
         non_receiver_args,
         body.clone(),
     );
@@ -213,8 +223,7 @@ fn gen_impl_fn_enum(
     enum_: &syn::ItemEnum,
     fn_ingredient: &FnIngredient<'_>,
 ) -> syn::Result<syn::ImplItem> {
-    let trait_path = &fn_ingredient.trait_path;
-    let method_ident = &fn_ingredient.sig.ident;
+    let func_path = fn_ingredient.func_path();
     let args = fn_ingredient.args();
     let match_arms = enum_
         .variants
@@ -232,7 +241,7 @@ fn gen_impl_fn_enum(
 
                     let ident = fields.named[0].ident.as_ref().unwrap();
                     Ok(quote! {
-                        Self::#variant_ident { #ident } => #trait_path::#method_ident(#ident #(,#args)*)
+                        Self::#variant_ident { #ident } => #func_path(#ident #(,#args)*)
                     })
                 }
                 syn::Fields::Unnamed(fields) => {
@@ -245,15 +254,13 @@ fn gen_impl_fn_enum(
 
                     let ident = syn::Ident::new("x", Span::call_site());
                     Ok(quote! {
-                        Self::#variant_ident(x) => #trait_path::#method_ident(#ident #(,#args)*)
+                        Self::#variant_ident(x) => #func_path(#ident #(,#args)*)
                     })
                 }
-                syn::Fields::Unit => {
-                    Err(syn::Error::new_spanned(
-                        variant,
-                        "fields of enum variant must be a field",
-                    ))
-                }
+                syn::Fields::Unit => Err(syn::Error::new_spanned(
+                    variant,
+                    "fields of enum variant must be a field",
+                )),
             }
         })
         .collect::<syn::Result<Vec<_>>>()?;
@@ -292,12 +299,11 @@ fn gen_impl_fn_struct(
 
     let sig = generic_param_replacer.replace_signature(fn_ingredient.sig.clone());
     let sig = self_replacer::make_self_hygienic_in_signature(sig);
-    let trait_path = &fn_ingredient.trait_path;
-    let method_ident = &fn_ingredient.sig.ident;
+    let func_path = fn_ingredient.func_path();
     let args = fn_ingredient.args();
     Ok(parse_quote! {
         #sig {
-            #trait_path::#method_ident(#receiver #(,#args)*)
+            #func_path(#receiver #(,#args)*)
         }
     })
 }

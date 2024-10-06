@@ -543,8 +543,8 @@ mod tests {
             impl AsRef<str> for Hoge {
                 fn as_ref(&self) -> &str {
                     match self {
-                        Self::A(x) => AsRef::as_ref(x),
-                        Self::B(x) => AsRef::as_ref(x),
+                        Self::A(x) => AsRef::<str>::as_ref(x),
+                        Self::B(x) => AsRef::<str>::as_ref(x),
                     }
                 }
             }
@@ -570,7 +570,7 @@ mod tests {
         quote! {
             impl AsRef<str> for Hoge {
                 fn as_ref(&self) -> &str {
-                    AsRef::as_ref(&self.s)
+                    AsRef::<str>::as_ref(&self.s)
                 }
             }
         },
@@ -593,7 +593,7 @@ mod tests {
         quote! {
             impl AsRef<(dyn Fn(usize) -> usize + 'static)> for Hoge {
                 fn as_ref(&self) -> &(dyn Fn(usize) -> usize + 'static) {
-                    AsRef::as_ref(&self.0)
+                    AsRef::<(dyn Fn(usize) -> usize + 'static)>::as_ref(&self.0)
                 }
             }
         },
@@ -614,7 +614,7 @@ mod tests {
         quote! {
             impl Hello<'p, str> for Hoge<'p> {
                 fn hello(&self) -> &'p str {
-                    Hello::hello(&self.0)
+                    Hello::<'p, str>::hello(&self.0)
                 }
             }
         },
