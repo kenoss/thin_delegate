@@ -13,15 +13,17 @@
 mod attr_remover;
 mod decl_macro;
 mod derive_delegate_args;
+mod external_trait_def_args;
 mod fn_call_replacer;
 mod gen;
 mod generic_param_replacer;
 mod self_replacer;
 
 use crate::derive_delegate_args::DeriveDelegateArgs;
+use crate::external_trait_def_args::ExternalTraitDefArgs;
 use crate::gen::TraitData;
-use proc_macro2::TokenStream;
-use quote::quote;
+use proc_macro2::{Span, TokenStream};
+use quote::{quote, ToTokens};
 use std::ops::Deref;
 use syn::parse_quote;
 use syn::spanned::Spanned;
@@ -39,9 +41,7 @@ pub fn external_trait_def(
 }
 
 fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
-    if !args.is_empty() {
-        return Err(syn::Error::new_spanned(args, "arguments must be empty"));
-    }
+    let args = syn::parse2::<ExternalTraitDefArgs>(args)?;
 
     let e = syn::Error::new(item.span(), "expected `mod ... { ... }`");
     let item = syn::parse2::<syn::Item>(item).map_err(|_| e.clone())?;
@@ -52,6 +52,25 @@ fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<T
         return Err(e);
     };
 
+    let uses = if args.with_uses {
+        let mut uses = vec![];
+
+        for mut item in &mut content.1 {
+            #[allow(clippy::single_match)]
+            match &mut item {
+                syn::Item::Use(use_) => {
+                    use_.attrs.push(parse_quote! { #[allow(unused)] });
+                    uses.push(use_.clone());
+                }
+                _ => {}
+            }
+        }
+
+        Some(quote! { #(#uses)* })
+    } else {
+        None
+    };
+
     for item in &mut content.1 {
         #[allow(clippy::single_match)]
         match item {
@@ -60,6 +79,13 @@ fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<T
                     #[::thin_delegate::__internal__is_external_marker]
                 };
                 trait_.attrs.push(attr);
+
+                if let Some(uses) = &uses {
+                    let attr = parse_quote! {
+                        #[::thin_delegate::__internal__with_uses(#uses)]
+                    };
+                    trait_.attrs.push(attr);
+                }
             }
             _ => {}
         }
@@ -248,7 +274,40 @@ fn internal_derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Re
         panic!()
     };
 
-    gen::gen_impl(&args, &trait_, &trait_path.clone(), &structenum, impl_)
+    let with_uses_path = parse_quote! { ::thin_delegate::__internal__with_uses };
+    let uses = trait_.attrs.iter().find_map(|attr| match &attr.meta {
+        syn::Meta::List(meta) if meta.path == with_uses_path => Some(meta.tokens.clone()),
+        _ => None,
+    });
+
+    let mod_name = format!(
+        "__thin_delegate__impl_{}_for_{}",
+        trait_path.to_token_stream(),
+        impl_.self_ty.to_token_stream()
+    );
+    // For simplicity, we allow only ascii characters so far.
+    //
+    // TODO: Support non ascii characters.
+    let mod_name = mod_name.replace(|c: char| !c.is_ascii_alphabetic(), "_");
+    let mod_name = syn::Ident::new_raw(&mod_name, Span::call_site());
+
+    let impl_ = gen::gen_impl(&args, &trait_, &trait_path.clone(), &structenum, impl_)?;
+
+    if let Some(uses) = uses {
+        Ok(quote! {
+            mod #mod_name {
+                use super::*;
+
+                #uses
+
+                #impl_
+            }
+        })
+    } else {
+        Ok(quote! {
+            #impl_
+        })
+    }
 }
 
 #[cfg(test)]
