@@ -2,7 +2,7 @@
 //!
 //! ## Status
 //!
-//! v0.0.1, alpha
+//! v0.0.3, alpha
 //!
 //! Development phase. The author is trying to use it.
 //!
