@@ -47,7 +47,7 @@ impl WritableBuffer for StringBuffer<'_> {
 
 impl<T> Hello<T> for String
 where
-    T: Writable
+    T: Writable,
 {
     fn hello(&self, buf: &mut <T as Writable>::Buffer<'_>) {
         buf.write(&self);

@@ -16,10 +16,10 @@ mod __external_trait_def {
         pub(crate) mod input {
             #[thin_delegate::external_trait_def(with_uses = true)]
             pub(crate) mod keyboard {
-                use ::smithay::backend::input::KeyState;
-                use ::smithay::input::keyboard::{KeysymHandle, ModifiersState};
-                use ::smithay::input::SeatHandler;
-                use ::smithay::utils::Serial;
+                use smithay::backend::input::KeyState;
+                use smithay::input::keyboard::{KeysymHandle, ModifiersState};
+                use smithay::input::SeatHandler;
+                use smithay::utils::Serial;
 
                 #[thin_delegate::register]
                 pub trait KeyboardTarget<D>:
@@ -60,14 +60,14 @@ mod __external_trait_def {
 
             #[thin_delegate::external_trait_def(with_uses = true)]
             pub(crate) mod pointer {
-                use ::smithay::input::pointer::{
+                use smithay::input::pointer::{
                     AxisFrame, ButtonEvent, GestureHoldBeginEvent, GestureHoldEndEvent,
                     GesturePinchBeginEvent, GesturePinchEndEvent, GesturePinchUpdateEvent,
                     GestureSwipeBeginEvent, GestureSwipeEndEvent, GestureSwipeUpdateEvent,
                     MotionEvent, RelativeMotionEvent,
                 };
-                use ::smithay::input::SeatHandler;
-                use ::smithay::utils::{IsAlive, Serial};
+                use smithay::input::SeatHandler;
+                use smithay::utils::{IsAlive, Serial};
 
                 #[thin_delegate::register]
                 pub trait PointerTarget<D>:
@@ -166,11 +166,11 @@ mod __external_trait_def {
 
             #[thin_delegate::external_trait_def(with_uses = true)]
             pub(crate) mod touch {
-                use ::smithay::input::touch::{
+                use smithay::input::touch::{
                     DownEvent, MotionEvent, OrientationEvent, ShapeEvent, UpEvent,
                 };
-                use ::smithay::input::SeatHandler;
-                use ::smithay::utils::Serial;
+                use smithay::input::SeatHandler;
+                use smithay::utils::Serial;
 
                 #[thin_delegate::register]
                 pub trait TouchTarget<D>: IsAlive + PartialEq + Clone + fmt::Debug + Send

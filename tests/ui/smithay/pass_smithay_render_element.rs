@@ -7,9 +7,7 @@ mod external_trait_def {
     use smithay::backend::renderer::element::{Id, Kind, UnderlyingStorage};
     use smithay::backend::renderer::utils::CommitCounter;
     use smithay::backend::renderer::{ImportAll, ImportMem, Renderer};
-    use smithay::utils::{
-        Buffer as BufferCoords, Physical, Point, Rectangle, Scale, Transform,
-    };
+    use smithay::utils::{Buffer as BufferCoords, Physical, Point, Rectangle, Scale, Transform};
 
     #[thin_delegate::register]
     pub trait Element {

@@ -1,21 +1,21 @@
 error: fields of enum variant must be a field
-  --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:31:5
+  --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:28:5
    |
-31 |     Unit,
+28 |     Unit,
    |     ^^^^
 ...
-34 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
+31 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
    | -------------------------------------------------------------------------- in this procedural macro expansion
    |
    = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Unit` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: fields of enum variant must be a field
-  --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:23:12
+  --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:20:12
    |
-23 |     Unnamed(String, String),
+20 |     Unnamed(String, String),
    |            ^^^^^^^^^^^^^^^^
 ...
-26 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
+23 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
    | -------------------------------------------------------------------------- in this procedural macro expansion
    |
    = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Unnamed` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
@@ -23,14 +23,10 @@ error: fields of enum variant must be a field
 error: fields of enum variant must be a field
   --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:12:11
    |
-12 |       Named {
-   |  ___________^
-13 | |         x: String,
-14 | |         y: String,
-15 | |     },
-   | |_____^
+12 |     Named { x: String, y: String },
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-18 |   #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
-   |   -------------------------------------------------------------------------- in this procedural macro expansion
+15 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
+   | -------------------------------------------------------------------------- in this procedural macro expansion
    |
    = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Named` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)

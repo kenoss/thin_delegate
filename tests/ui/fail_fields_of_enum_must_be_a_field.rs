@@ -9,10 +9,7 @@ mod __external_trait_def {
 
 #[thin_delegate::register]
 enum Named {
-    Named {
-        x: String,
-        y: String,
-    },
+    Named { x: String, y: String },
 }
 
 #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]

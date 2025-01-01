@@ -4,9 +4,9 @@
 // For example, consider to define `hello_box(self: Box<Self>)` for a type `struct Hoge(String)`.
 // `Hoge::hello_box()` receives `Box<Hoge>`, but the inner type is not boxed.
 
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::pin::Pin;
 
 #[thin_delegate::register]
 pub trait Hello {
