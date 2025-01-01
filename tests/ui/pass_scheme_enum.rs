@@ -21,7 +21,7 @@ enum Hoge {
     B(char),
 }
 
-#[thin_delegate::derive_delegate(scheme = |f| {
+#[thin_delegate::fill_delegate(scheme = |f| {
     match self {
         Self::A(s) => f(&format!("{s}{s}")),
         Self::B(c) => f(c),

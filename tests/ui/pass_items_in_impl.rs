@@ -27,7 +27,7 @@ impl Hello for String {
 #[thin_delegate::register]
 struct Hoge(String);
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello for Hoge {
     // It can handle associated types in impl.
     //

@@ -239,10 +239,10 @@ mod __external_trait_def {
 #[thin_delegate::register]
 struct Window(smithay::desktop::Window);
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def::smithay::utils)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def::smithay::utils)]
 impl smithay::utils::IsAlive for Window {}
 
-#[thin_delegate::derive_delegate(
+#[thin_delegate::fill_delegate(
     external_trait_def = __external_trait_def::smithay::input::keyboard,
     scheme = |f| {
         match self.0.underlying_surface() {
@@ -261,10 +261,10 @@ enum KeyboardFocusTarget {
     Popup(smithay::desktop::PopupKind),
 }
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def::smithay::utils)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def::smithay::utils)]
 impl smithay::utils::IsAlive for KeyboardFocusTarget {}
 
-#[thin_delegate::derive_delegate(
+#[thin_delegate::fill_delegate(
     external_trait_def = __external_trait_def::smithay::input::keyboard,
     scheme = |f| {
         match self {
@@ -283,13 +283,13 @@ enum PointerFocusTarget {
     X11Surface(smithay::xwayland::X11Surface),
 }
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def::smithay::utils)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def::smithay::utils)]
 impl smithay::utils::IsAlive for PointerFocusTarget {}
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def::smithay::input::pointer)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def::smithay::input::pointer)]
 impl smithay::input::pointer::PointerTarget<State> for PointerFocusTarget {}
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def::smithay::input::touch)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def::smithay::input::touch)]
 impl smithay::input::touch::TouchTarget<State> for PointerFocusTarget {}
 
 struct State;

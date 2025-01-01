@@ -21,13 +21,13 @@ enum HogeEnum {
     B(char),
 }
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello for HogeEnum {}
 
 #[thin_delegate::register]
 struct HogeStruct(String);
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello for HogeStruct {}
 
 fn main() {}

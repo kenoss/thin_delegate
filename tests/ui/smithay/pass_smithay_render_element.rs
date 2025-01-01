@@ -88,7 +88,7 @@ where
     Decoration(SolidColorRenderElement),
 }
 
-#[thin_delegate::derive_delegate(external_trait_def = external_trait_def)]
+#[thin_delegate::fill_delegate(external_trait_def = external_trait_def)]
 impl<R> smithay::backend::renderer::element::Element for WindowRenderElement<R>
 where
     R: smithay::backend::renderer::Renderer,
@@ -97,7 +97,7 @@ where
 {
 }
 
-#[thin_delegate::derive_delegate(external_trait_def = external_trait_def)]
+#[thin_delegate::fill_delegate(external_trait_def = external_trait_def)]
 impl<R> smithay::backend::renderer::element::RenderElement<R> for WindowRenderElement<R>
 where
     R: smithay::backend::renderer::Renderer,

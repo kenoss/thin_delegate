@@ -4,7 +4,7 @@
 //! inner types.
 //!
 //! - `#[thin_delegate::register]`: Registers definitions of trait, struct and enum.
-//! - `#[thin_delegate::derive_delegate]`: Derives and fills `impl Trait for StructEnum` by delegation.
+//! - `#[thin_delegate::fill_delegate]`: Derives and fills `impl Trait for StructEnum` by delegation.
 //! - `#[thin_delegate::external_trait_def]`: Imports trait definitions in external crates.
 //!
 //! There exist similar crates. See [comparison](#comparison) for more details.
@@ -52,12 +52,12 @@
 //!
 //! // Delegate all methods to `String`. Leave `walk()` umimplemented.
 //! // Delegation of a struct with single field is automatic.
-//! #[thin_delegate::derive_delegate]
+//! #[thin_delegate::fill_delegate]
 //! impl AnimalI for Duck {}
 //!
 //! // Delegate `sound()` to `sound: String`. Implement `walk()` manually.
 //! // Delegation of a struct with multiple fields is ambiguous. Needs to designate `scheme`.
-//! #[thin_delegate::derive_delegate(scheme = |f| f(&self.sound))]
+//! #[thin_delegate::fill_delegate(scheme = |f| f(&self.sound))]
 //! impl AnimalI for Cat {
 //!     fn walk(&mut self, pos: usize) -> usize {
 //!         pos + self.speed
@@ -66,7 +66,7 @@
 //!
 //! // Delegate all methods to each arms `Duck` and `Cat`.
 //! // Delegation of an enum is automatic.
-//! #[thin_delegate::derive_delegate]
+//! #[thin_delegate::fill_delegate]
 //! impl AnimalI for Animal {}
 //!
 //! let duck = Duck("quack".to_string());
@@ -108,9 +108,9 @@
 //! ## How it works
 //!
 //! 1. `#[thin_delegate::register]` defines a declarative macro for each trait/struct/enum definition.
-//! 2. `#[thin_delegate::derive_delegate]` collects related definitions by using those declarative macros and CPS,
-//!    and then calls an attribute macro `#[thin_delegate::__internal__derive_delegate]`.
-//! 3. `#[thin_delegate::__internal__derive_delegate]` fills `impl Trait for StructEnum {...}`.
+//! 2. `#[thin_delegate::fill_delegate]` collects related definitions by using those declarative macros and CPS,
+//!    and then calls an attribute macro `#[thin_delegate::__internal__fill_delegate]`.
+//! 3. `#[thin_delegate::__internal__fill_delegate]` fills `impl Trait for StructEnum {...}`.
 //!
 //! See [src/decl_macro.rs](https://github.com/kenoss/thin_delegate/blob/main/src/decl_macro.rs) for more details.
 //!
@@ -118,14 +118,14 @@
 //!
 //! ### What is an error like <code>error: cannot find macro \`__thin_delegate__feed_trait_def_of_Hello\` in this scope</code>?
 //!
-//! In the above step 2, `#[thin_delegate::derive_delegate]` needs some declarative macros.
+//! In the above step 2, `#[thin_delegate::fill_delegate]` needs some declarative macros.
 //! This error reports that rustc couldn't find the macro.
 //!
 //! Recommended actions:
 //!
 //! - Make sure that your trait/struct/enum is qualified with `#[thin_delegate::register]` correctly.
 //! - If you are using an external trait definition, make sure that a path of a module is given by
-//!   an argument `external_trait_def` of `#[thin_delegate::derive_delegate]` and the module is
+//!   an argument `external_trait_def` of `#[thin_delegate::fill_delegate]` and the module is
 //!   qualified with `#[thin_delegate::external_trait_def]`.
 //!
 //! See `fail_register_for_*.rs` in [tests](https://github.com/kenoss/thin_delegate/tree/main/tests/ui)
@@ -187,15 +187,15 @@
 
 mod attr_remover;
 mod decl_macro;
-mod derive_delegate_args;
 mod external_trait_def_args;
+mod fill_delegate_args;
 mod fn_call_replacer;
 mod gen;
 mod generic_param_replacer;
 mod self_replacer;
 
-use crate::derive_delegate_args::DeriveDelegateArgs;
 use crate::external_trait_def_args::ExternalTraitDefArgs;
+use crate::fill_delegate_args::FillDelegateArgs;
 use crate::gen::TraitData;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
@@ -211,7 +211,7 @@ use syn::spanned::Spanned;
 ///
 /// ### `with_uses = <bool>`
 ///
-/// If `true`, `#[thin_delegate::derive_delegate]` wraps `impl Trait for StructEnum` within a module
+/// If `true`, `#[thin_delegate::fill_delegate]` wraps `impl Trait for StructEnum` within a module
 /// and expands the imports `use ...` in the orginal module to the expanded module. It is convenient
 /// to copy&paste the original definition as is.
 ///
@@ -298,7 +298,7 @@ pub fn __internal__is_external_marker(
         .into()
 }
 
-/// An attribute macro registering a definition of trait/struct/enum for `#[thin_delegate::derive_delegate]`
+/// An attribute macro registering a definition of trait/struct/enum for `#[thin_delegate::fill_delegate]`
 ///
 /// See [toplevel documentation](./) for fundamental usage.
 #[proc_macro_attribute]
@@ -400,7 +400,7 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
 ///
 /// How it works (See also [How it works](./index.html#how-it-works).):
 /// `#[thin_delegate::register]` defines a macro that contains information of a trait.
-/// Normally, `#[thin_delegate::derive_delegate]` searches the macro in current module.
+/// Normally, `#[thin_delegate::fill_delegate]` searches the macro in current module.
 /// The argument `external_trait_def = path::to::mod` modifies it to search
 /// `path::to::mod::<macro>`.
 ///
@@ -430,7 +430,7 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
 ///     }
 /// }
 ///
-/// #[thin_delegate::derive_delegate(scheme = |f| f(&self.key()))]
+/// #[thin_delegate::fill_delegate(scheme = |f| f(&self.key()))]
 /// impl Hello for Hoge {}
 /// ```
 ///
@@ -439,21 +439,21 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
 ///
 /// See also [example](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_scheme_enum.rs).
 #[proc_macro_attribute]
-pub fn derive_delegate(
+pub fn fill_delegate(
     args: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let item: TokenStream = item.into();
 
-    match derive_delegate_aux(args.into(), item.clone()) {
+    match fill_delegate_aux(args.into(), item.clone()) {
         Ok(x) => x.into(),
         Err(e) => TokenStream::from_iter([e.into_compile_error(), item]).into(),
     }
 }
 
-fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+fn fill_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     let args_as_tokenstream = args.clone();
-    let args = syn::parse2::<DeriveDelegateArgs>(args)?;
+    let args = syn::parse2::<FillDelegateArgs>(args)?;
     args.validate()?;
 
     let e = syn::Error::new_spanned(&item, "expected `impl <Trait> for <Type>`");
@@ -471,7 +471,7 @@ fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<Toke
     let trait_ident = &trait_path.segments.last().unwrap().ident;
     let structenum_ident = &structenum_path.path.segments.last().unwrap().ident;
 
-    Ok(decl_macro::exec_internal_derive_delegate(
+    Ok(decl_macro::exec_internal_fill_delegate(
         trait_ident,
         structenum_ident,
         &args.external_trait_def,
@@ -484,20 +484,20 @@ fn derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<Toke
 #[doc(hidden)]
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn __internal__derive_delegate(
+pub fn __internal__fill_delegate(
     args: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    match internal_derive_delegate_aux(args.into(), input.into()) {
+    match internal_fill_delegate_aux(args.into(), input.into()) {
         Ok(x) => x.into(),
         Err(e) => TokenStream::from_iter([e.into_compile_error()]).into(),
     }
 }
 
-fn internal_derive_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+fn internal_fill_delegate_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     // We'll use panic here as it is only used by this crate.
 
-    let args = syn::parse2::<DeriveDelegateArgs>(args)?;
+    let args = syn::parse2::<FillDelegateArgs>(args)?;
     args.validate()?;
 
     let item = syn::parse2::<syn::Item>(item.clone()).unwrap();
@@ -569,7 +569,7 @@ mod tests {
         };
     }
 
-    macro_rules! test_internal_derive_delegate {
+    macro_rules! test_internal_fill_delegate {
         (
             $test_name:ident,
             $args:expr,
@@ -587,14 +587,14 @@ mod tests {
                         #input
                     }
                 };
-                compare_result!(internal_derive_delegate_aux(args, input), Ok(expected));
+                compare_result!(internal_fill_delegate_aux(args, input), Ok(expected));
 
                 Ok(())
             }
         };
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         r#enum,
         quote! {},
         quote! {
@@ -623,7 +623,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         enum_ref_mut_receiver,
         quote! {},
         quote! {
@@ -652,7 +652,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         enum_consume_receiver,
         quote! {},
         quote! {
@@ -681,7 +681,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         struct_with_named_field,
         quote! {},
         quote! {
@@ -704,7 +704,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         struct_with_unnamed_field,
         quote! {},
         quote! {
@@ -725,7 +725,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         struct_ref_mut_receiver,
         quote! {},
         quote! {
@@ -748,7 +748,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         struct_consume_receiver,
         quote! {},
         quote! {
@@ -771,7 +771,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         method_with_args,
         quote! {},
         quote! {
@@ -798,7 +798,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         super_trait,
         quote! {},
         quote! {
@@ -825,7 +825,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         generics_enum,
         quote! {},
         quote! {
@@ -854,7 +854,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         generics_struct,
         quote! {},
         quote! {
@@ -879,7 +879,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         generics_specilize_complex,
         quote! {},
         quote! {
@@ -902,7 +902,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         generics_specilize_lifetime,
         quote! {},
         quote! {
@@ -923,7 +923,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         items_in_impl,
         quote! {},
         quote! {
@@ -977,7 +977,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         macro_in_impl,
         quote! {},
         quote! {
@@ -990,7 +990,7 @@ mod tests {
 
             impl Hello for Hoge {
                 // `thin_delegate` can't recognize associated functions generated by macros because
-                // the expansion of `#[thin_delegate::derive_delegate]` is earlier than ones of
+                // the expansion of `#[thin_delegate::fill_delegate]` is earlier than ones of
                 // macros inside.
                 gen_override! {self, {
                     self.0.override_().to_uppercase()
@@ -1014,7 +1014,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         scheme,
         quote! {
             scheme = |f| f(&self.key())
@@ -1037,7 +1037,7 @@ mod tests {
         },
     }
 
-    test_internal_derive_delegate! {
+    test_internal_fill_delegate! {
         scheme_enum,
         quote! {
             scheme = |f| {

@@ -38,7 +38,7 @@ mod __external_trait_def {
 
     #[thin_delegate::register]
     pub trait Hi {
-        // Not good. In `#[thin_delegate::derive_delegate]`, it will be expanded as is. So, one
+        // Not good. In `#[thin_delegate::fill_delegate]`, it will be expanded as is. So, one
         // needs to `use` for each derive. It's not convernient if a trait uses lots of types.
         fn hi(&self, arg: Arg) -> String;
     }
@@ -48,11 +48,11 @@ mod __external_trait_def {
 struct Hoge(String);
 
 // OK.
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
 impl external::Hello for Hoge {}
 
 // NG.
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
 impl external::Hi for Hoge {}
 
 fn main() {

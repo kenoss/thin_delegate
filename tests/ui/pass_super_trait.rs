@@ -32,7 +32,7 @@ impl ToString for Hoge {
     }
 }
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello for Hoge {}
 
 fn main() {

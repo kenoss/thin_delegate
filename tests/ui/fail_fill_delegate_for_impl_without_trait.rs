@@ -1,7 +1,7 @@
 #[thin_delegate::register]
 struct Hoge(String);
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hoge {}
 
 fn main() {}

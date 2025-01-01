@@ -4,10 +4,10 @@ error[E0412]: cannot find type `Arg` in this scope
 43 |         fn hi(&self, arg: Arg) -> String;
    |                           ^^^ not found in this scope
 ...
-55 | #[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
-   | ---------------------------------------------------------------------------- in this procedural macro expansion
+55 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
+   | -------------------------------------------------------------------------- in this procedural macro expansion
    |
-   = note: this error originates in the macro `__external_trait_def::__thin_delegate__feed_trait_def_of_external_Hi` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the macro `__external_trait_def::__thin_delegate__feed_trait_def_of_external_Hi` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
 help: consider importing this struct
    |
 4  + use crate::external::Arg;

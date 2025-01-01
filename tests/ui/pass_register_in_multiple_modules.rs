@@ -13,7 +13,7 @@ mod a {
     #[thin_delegate::register]
     struct Hoge(String);
 
-    #[thin_delegate::derive_delegate]
+    #[thin_delegate::fill_delegate]
     impl Hello for Hoge {}
 }
 
@@ -32,7 +32,7 @@ mod b {
     #[thin_delegate::register]
     struct Hoge(String);
 
-    #[thin_delegate::derive_delegate]
+    #[thin_delegate::fill_delegate]
     impl Hello for Hoge {}
 }
 

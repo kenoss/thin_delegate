@@ -21,7 +21,7 @@ enum Hoge {
     B(char),
 }
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello for Hoge {}
 
 fn main() {

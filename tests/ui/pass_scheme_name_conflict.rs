@@ -44,14 +44,14 @@ enum Hoge {
 //
 // ^1 comes from a trait definition in the macro `__thin_delegate__trampoline2`.
 // ^2 comes from an enum definition in the macro `__thin_delegate__trampoline2`.
-// ^3 comes from `scheme`, `TokenStream` arg for `#[thin_delegate::derive_delegate]`.
+// ^3 comes from `scheme`, `TokenStream` arg for `#[thin_delegate::fill_delegate]`.
 //
 // The author's current guess:
 //
 // - The resolution of ^1(*) is not triggered because it comes from a trait definition.
 // - The resolution of ^3 is triggered because ^3 comes from a `TokenStream` in proc macro, and is
 //   caught by ^2 and ^1 is shadowed.
-#[thin_delegate::derive_delegate(scheme = |f| {
+#[thin_delegate::fill_delegate(scheme = |f| {
     match self {
         Self::A(a) => f(&format!("{}{}", a, a)),
         Self::B(b) => f(b),

@@ -49,7 +49,7 @@ enum Hoge {
 //
 // - The resolution of ^1(*) is not triggered because it comes from a trait definition.
 // - The resolution of ^2(*) is not triggered because it comes from an enum definition.
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello for Hoge {}
 
 fn main() {

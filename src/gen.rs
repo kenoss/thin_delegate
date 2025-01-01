@@ -1,4 +1,4 @@
-use crate::derive_delegate_args::DeriveDelegateArgs;
+use crate::fill_delegate_args::FillDelegateArgs;
 use crate::generic_param_replacer::GenericParamReplacer;
 use crate::{fn_call_replacer, self_replacer};
 use proc_macro2::{Span, TokenStream};
@@ -121,7 +121,7 @@ impl<'a> FnIngredient<'a> {
 }
 
 pub(crate) fn gen_impl(
-    args: &DeriveDelegateArgs,
+    args: &FillDelegateArgs,
     trait_: &syn::ItemTrait,
     trait_path: &syn::Path,
     structenum: &syn::Item,
@@ -162,7 +162,7 @@ pub(crate) fn gen_impl(
 }
 
 fn gen_impl_fn(
-    args: &DeriveDelegateArgs,
+    args: &FillDelegateArgs,
     generic_param_replacer: &GenericParamReplacer,
     item: &syn::Item,
     fn_ingredient: FnIngredient<'_>,
@@ -184,7 +184,7 @@ fn gen_impl_fn(
 }
 
 fn gen_impl_fn_scheme(
-    args: &DeriveDelegateArgs,
+    args: &FillDelegateArgs,
     generic_param_replacer: &GenericParamReplacer,
     fn_ingredient: &FnIngredient<'_>,
 ) -> Option<syn::ImplItem> {

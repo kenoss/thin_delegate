@@ -1,4 +1,4 @@
-// FYI: See `exec_internal_derive_delegate()` first.
+// FYI: See `exec_internal_fill_delegate()` first.
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -71,7 +71,7 @@ pub(crate) fn define_macro_feed_structenum_def_of(
     }
 }
 
-pub(crate) fn exec_internal_derive_delegate(
+pub(crate) fn exec_internal_fill_delegate(
     trait_ident: &syn::Ident,
     structenum_ident: &syn::Ident,
     external_trait_def: &Option<syn::Path>,
@@ -96,7 +96,7 @@ pub(crate) fn exec_internal_derive_delegate(
     // -> __thin_delegate__trampoline1!
     // -> #feed_structenum_def_of!
     // -> __thin_delegate__trampoline2!
-    // -> #[::thin_delegate::__internal__derive_delegate]
+    // -> #[::thin_delegate::__internal__fill_delegate]
     quote! {
         macro_rules! __thin_delegate__trampoline2 {
             {
@@ -104,7 +104,7 @@ pub(crate) fn exec_internal_derive_delegate(
                 @TRAIT_DEF { $trait_def:item },
                 @STRUCTENUM_DEF { $structenum_def:item },
             } => {
-                #[::thin_delegate::__internal__derive_delegate(#args)]
+                #[::thin_delegate::__internal__fill_delegate(#args)]
                 mod __thin_delegate__change_this_name {
                     $trait_def
 

@@ -14,7 +14,7 @@ impl Hello<u8, 4> for char {
 #[thin_delegate::register]
 struct Hoge(char);
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello<u8, 4> for Hoge {}
 
 fn main() {

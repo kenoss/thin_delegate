@@ -4,9 +4,9 @@ error: cannot find macro `__thin_delegate__feed_structenum_def_of_Hoge` in this 
 1  | #[thin_delegate::register]
    | -------------------------- similarly named macro `__thin_delegate__feed_trait_def_of_Hello` defined here
 ...
-12 | #[thin_delegate::derive_delegate]
-   | --------------------------------- in this procedural macro expansion
+12 | #[thin_delegate::fill_delegate]
+   | ------------------------------- in this procedural macro expansion
 13 | impl Hello for Hoge {}
    |                ^^^^ help: a macro with a similar name exists: `__thin_delegate__feed_trait_def_of_Hello`
    |
-   = note: this error originates in the macro `__thin_delegate__trampoline1` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the macro `__thin_delegate__trampoline1` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)

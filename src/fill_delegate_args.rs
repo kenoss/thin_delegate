@@ -8,12 +8,12 @@ mod kw {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct DeriveDelegateArgs {
+pub(crate) struct FillDelegateArgs {
     pub external_trait_def: Option<syn::Path>,
     pub scheme: Option<syn::ExprClosure>,
 }
 
-impl DeriveDelegateArgs {
+impl FillDelegateArgs {
     pub fn validate(&self) -> syn::Result<()> {
         let Some(scheme) = self.scheme.as_ref() else {
             return Ok(());
@@ -122,9 +122,9 @@ impl DeriveDelegateArgs {
     }
 }
 
-impl Parse for DeriveDelegateArgs {
+impl Parse for FillDelegateArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let mut this = DeriveDelegateArgs {
+        let mut this = FillDelegateArgs {
             external_trait_def: None,
             scheme: None,
         };
@@ -194,37 +194,37 @@ mod tests {
     #[test]
     fn parsable() {
         let input = quote! {};
-        let expected = DeriveDelegateArgs {
+        let expected = FillDelegateArgs {
             external_trait_def: None,
             scheme: None,
         };
-        assert_eq!(syn::parse2::<DeriveDelegateArgs>(input).unwrap(), expected);
+        assert_eq!(syn::parse2::<FillDelegateArgs>(input).unwrap(), expected);
 
         let input = quote! { external_trait_def = __external_trait_def };
-        let expected = DeriveDelegateArgs {
+        let expected = FillDelegateArgs {
             external_trait_def: Some(parse_quote! { __external_trait_def }),
             scheme: None,
         };
-        assert_eq!(syn::parse2::<DeriveDelegateArgs>(input).unwrap(), expected);
+        assert_eq!(syn::parse2::<FillDelegateArgs>(input).unwrap(), expected);
 
         let input = quote! { scheme = |f| f(&self.0.key()) };
-        let expected = DeriveDelegateArgs {
+        let expected = FillDelegateArgs {
             external_trait_def: None,
             scheme: Some(parse_quote! { |f| f(&self.0.key()) }),
         };
-        assert_eq!(syn::parse2::<DeriveDelegateArgs>(input).unwrap(), expected);
+        assert_eq!(syn::parse2::<FillDelegateArgs>(input).unwrap(), expected);
 
         let input =
             quote! { external_trait_def = __external_trait_def, scheme = |f| f(&self.0.key()) };
-        let expected = DeriveDelegateArgs {
+        let expected = FillDelegateArgs {
             external_trait_def: Some(parse_quote! { __external_trait_def }),
             scheme: Some(parse_quote! { |f| f(&self.0.key()) }),
         };
-        assert_eq!(syn::parse2::<DeriveDelegateArgs>(input).unwrap(), expected);
+        assert_eq!(syn::parse2::<FillDelegateArgs>(input).unwrap(), expected);
 
-        assert!(syn::parse2::<DeriveDelegateArgs>(quote! { hoge = hoge }).is_err());
-        assert!(syn::parse2::<DeriveDelegateArgs>(quote! { external_trait_def }).is_err());
-        assert!(syn::parse2::<DeriveDelegateArgs>(
+        assert!(syn::parse2::<FillDelegateArgs>(quote! { hoge = hoge }).is_err());
+        assert!(syn::parse2::<FillDelegateArgs>(quote! { external_trait_def }).is_err());
+        assert!(syn::parse2::<FillDelegateArgs>(
             quote! { external_trait_def = __external_trait_def,, }
         )
         .is_err());
@@ -235,7 +235,7 @@ mod tests {
         macro_rules! assert_validate_error {
             ($input:expr, $expected_msg:expr) => {
                 assert_eq!(
-                    syn::parse2::<DeriveDelegateArgs>($input)
+                    syn::parse2::<FillDelegateArgs>($input)
                         .unwrap()
                         .validate()
                         .map_err(|e| format!("{e}")),

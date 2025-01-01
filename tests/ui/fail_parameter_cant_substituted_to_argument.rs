@@ -6,7 +6,7 @@ trait Hello<'a, T> {
 #[thin_delegate::register]
 struct Hoge;
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello<String, String> for Hoge {}
 
 fn main() {}

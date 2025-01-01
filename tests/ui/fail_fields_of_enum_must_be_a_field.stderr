@@ -4,10 +4,10 @@ error: fields of enum variant must be a field
 31 |     Unit,
    |     ^^^^
 ...
-34 | #[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
-   | ---------------------------------------------------------------------------- in this procedural macro expansion
+34 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
+   | -------------------------------------------------------------------------- in this procedural macro expansion
    |
-   = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Unit` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Unit` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: fields of enum variant must be a field
   --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:23:12
@@ -15,10 +15,10 @@ error: fields of enum variant must be a field
 23 |     Unnamed(String, String),
    |            ^^^^^^^^^^^^^^^^
 ...
-26 | #[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
-   | ---------------------------------------------------------------------------- in this procedural macro expansion
+26 | #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
+   | -------------------------------------------------------------------------- in this procedural macro expansion
    |
-   = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Unnamed` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Unnamed` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: fields of enum variant must be a field
   --> tests/ui/fail_fields_of_enum_must_be_a_field.rs:12:11
@@ -30,7 +30,7 @@ error: fields of enum variant must be a field
 15 | |     },
    | |_____^
 ...
-18 |   #[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
-   |   ---------------------------------------------------------------------------- in this procedural macro expansion
+18 |   #[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
+   |   -------------------------------------------------------------------------- in this procedural macro expansion
    |
-   = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Named` which comes from the expansion of the attribute macro `thin_delegate::derive_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the macro `__thin_delegate__feed_structenum_def_of_Named` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)

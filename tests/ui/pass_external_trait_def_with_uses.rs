@@ -25,7 +25,7 @@ mod external {
     }
 }
 
-// Each `#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]` will be
+// Each `#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]` will be
 // expanded with uses as:
 //
 // ```
@@ -57,10 +57,10 @@ mod __external_trait_def {
 #[thin_delegate::register]
 struct Hoge(String);
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
 impl external::Hello for Hoge {}
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
 impl external::Hi for Hoge {}
 
 fn main() {

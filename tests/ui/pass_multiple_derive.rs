@@ -42,10 +42,10 @@ enum Hoge {
     B(char),
 }
 
-#[thin_delegate::derive_delegate(external_trait_def = __external_trait_def)]
+#[thin_delegate::fill_delegate(external_trait_def = __external_trait_def)]
 impl ToString for Hoge {}
 
-#[thin_delegate::derive_delegate]
+#[thin_delegate::fill_delegate]
 impl Hello for Hoge {}
 
 fn main() {
