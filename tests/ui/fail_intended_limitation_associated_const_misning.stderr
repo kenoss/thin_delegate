@@ -1,0 +1,8 @@
+error[E0046]: not all trait items implemented, missing: `NEED_TO_FILL`
+  --> tests/ui/fail_intended_limitation_associated_const_misning.rs:36:1
+   |
+11 |     const NEED_TO_FILL: &'static str;
+   |     -------------------------------- `NEED_TO_FILL` from trait
+...
+36 | impl Hello for Hoge {
+   | ^^^^^^^^^^^^^^^^^^^ missing `NEED_TO_FILL` in implementation

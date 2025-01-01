@@ -1,4 +1,8 @@
-// `#[thin_delegate::fill_delegate]` filles missning trait functions.
+// `#[thin_delegate::fill_delegate]` fills missing trait functions. It allows to manually define
+// associated items.
+//
+// Compare with fail_intended_limitation_associated_const_misning.rs and
+// fail_intended_limitation_associated_type_missing.rs
 
 #[thin_delegate::register]
 trait Hello {

@@ -1,0 +1,8 @@
+error[E0046]: not all trait items implemented, missing: `Return`
+  --> tests/ui/fail_intended_limitation_associated_type_missing.rs:36:1
+   |
+8  |     type Return;
+   |     ----------- `Return` from trait
+...
+36 | impl Hello for Hoge {
+   | ^^^^^^^^^^^^^^^^^^^ missing `Return` in implementation
