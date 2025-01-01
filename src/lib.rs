@@ -1,14 +1,189 @@
-//! Auto implementation of trivial delegation to inner types.
+//! Auto implementation of trait functions by delegation to inner types
 //!
-//! ## Status
+//! This crate provides attribute macros that supports to define trait functions by delegation to
+//! inner types.
 //!
-//! v0.0.3, alpha
+//! - `#[thin_delegate::register]`: Registers definitions of trait, struct and enum.
+//! - `#[thin_delegate::derive_delegate]`: Derives and fills `impl Trait for StructEnum` by delegation.
+//! - `#[thin_delegate::external_trait_def]`: Imports trait definitions in external crates.
 //!
-//! Development phase. The author is trying to use it.
+//! There exist similar crates. See [comparison](#comparison) for more details.
 //!
-//! ## TODO
+//! See also related RFCs:
+//! [rfcs#1406](https://github.com/rust-lang/rfcs/pull/1406),
+//! [rfcs#2393](https://github.com/rust-lang/rfcs/pull/2393),
+//! [rfcs#3530](https://github.com/rust-lang/rfcs/pull/3530).
 //!
-//! - [ ] Documentation
+//! ## Example
+//!
+//! ```
+//! #[thin_delegate::register]
+//! trait AnimalI {
+//!     fn sound(&self) -> String;
+//!     fn walk(&mut self, pos: usize) -> usize;
+//! }
+//!
+//! #[thin_delegate::register]
+//! struct Duck(String);
+//!
+//! #[thin_delegate::register]
+//! struct Cat {
+//!     sound: String,
+//!     speed: usize,
+//! }
+//!
+//! #[thin_delegate::register]
+//! enum Animal {
+//!     Duck(Duck),
+//!     Cat(Cat),
+//! }
+//!
+//! // Implement delegatee manually.
+//! impl AnimalI for String {
+//!     fn sound(&self) -> String {
+//!         self.clone()
+//!     }
+//!
+//!     // String doesn't walk.
+//!     fn walk(&mut self, _pos: usize) -> usize {
+//!         unimplemented!();
+//!     }
+//! }
+//!
+//! // Delegate all methods to `String`. Leave `walk()` umimplemented.
+//! // Delegation of a struct with single field is automatic.
+//! #[thin_delegate::derive_delegate]
+//! impl AnimalI for Duck {}
+//!
+//! // Delegate `sound()` to `sound: String`. Implement `walk()` manually.
+//! // Delegation of a struct with multiple fields is ambiguous. Needs to designate `scheme`.
+//! #[thin_delegate::derive_delegate(scheme = |f| f(&self.sound))]
+//! impl AnimalI for Cat {
+//!     fn walk(&mut self, pos: usize) -> usize {
+//!         pos + self.speed
+//!     }
+//! }
+//!
+//! // Delegate all methods to each arms `Duck` and `Cat`.
+//! // Delegation of an enum is automatic.
+//! #[thin_delegate::derive_delegate]
+//! impl AnimalI for Animal {}
+//!
+//! let duck = Duck("quack".to_string());
+//! let mut cat = Cat { sound: "mew".to_string(), speed: 1 };
+//! let mut neko = Cat { sound: "nya-nya-".to_string(), speed: 2 };
+//! assert_eq!(duck.sound(), "quack");
+//! assert_eq!(cat.sound(), "mew");
+//! assert_eq!(cat.walk(10), 11);
+//! assert_eq!(neko.sound(), "nya-nya-");
+//! assert_eq!(neko.walk(10), 12);
+//! let duck = Animal::Duck(duck);
+//! let mut cat = Animal::Cat(cat);
+//! let mut neko = Animal::Cat(neko);
+//! assert_eq!(duck.sound(), "quack");
+//! assert_eq!(cat.sound(), "mew");
+//! assert_eq!(cat.walk(10), 11);
+//! assert_eq!(neko.sound(), "nya-nya-");
+//! assert_eq!(neko.walk(10), 12);
+//! ```
+//!
+//! See [tests](https://github.com/kenoss/thin_delegate/blob/main/tests/ui) for more examples and
+//! [sabiniwm](https://github.com/kenoss/sabiniwm) for real world examples.
+//!
+//! - `external_trait_def`
+//!   - [Import external trait definition](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_external_trait_def.rs)
+//!   - [Import external trait definition with `use`s](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_external_trait_def_with_uses.rs)
+//! - `scheme`
+//!   - [struct](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_scheme.rs)
+//!   - [enum](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_scheme_enum.rs)
+//! - Trait admits
+//!   - Generics
+//!     - [complex type parameter](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_generics_specialize_complex.rs)
+//!     - [const](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_generics_const.rs)
+//!   - Trait bounds
+//!     - [super trait](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_super_trait.rs)
+//!     - [`where` and complex method argument](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_prevent_ambiguous_generic_params.rs)
+//! - [Only fills not implemented methods](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_items_in_impl.rs)
+//!
+//! ## How it works
+//!
+//! 1. `#[thin_delegate::register]` defines a declarative macro for each trait/struct/enum definition.
+//! 2. `#[thin_delegate::derive_delegate]` collects related definitions by using those declarative macros and CPS,
+//!    and then calls an attribute macro `#[thin_delegate::__internal__derive_delegate]`.
+//! 3. `#[thin_delegate::__internal__derive_delegate]` fills `impl Trait for StructEnum {...}`.
+//!
+//! See [src/decl_macro.rs](https://github.com/kenoss/thin_delegate/blob/main/src/decl_macro.rs) for more details.
+//!
+//! ## FAQ
+//!
+//! ### What is an error like <code>error: cannot find macro \`__thin_delegate__feed_trait_def_of_Hello\` in this scope</code>?
+//!
+//! In the above step 2, `#[thin_delegate::derive_delegate]` needs some declarative macros.
+//! This error reports that rustc couldn't find the macro.
+//!
+//! Recommended actions:
+//!
+//! - Make sure that your trait/struct/enum is qualified with `#[thin_delegate::register]` correctly.
+//! - If you are using an external trait definition, make sure that a path of a module is given by
+//!   an argument `external_trait_def` of `#[thin_delegate::derive_delegate]` and the module is
+//!   qualified with `#[thin_delegate::external_trait_def]`.
+//!
+//! See `fail_register_for_*.rs` in [tests](https://github.com/kenoss/thin_delegate/tree/main/tests/ui)
+//! for the exact error messages.
+//!
+//! ## Performance
+//!
+//! Note that using `enum` is more performant than `Box<dyn Trait>` in general case.
+//! (The main reason is not using vtable. One can expect branch prediction works for `match` in most-inner loops.)
+//! See also
+//! [benchmark of `enum_dispatch`](https://docs.rs/enum_dispatch/0.3.13/enum_dispatch/index.html#performance).
+//! It would be an option if you need just a polymorphism closed in your application. See
+//! [`Backend` in sabiniwm](https://github.com/kenoss/sabiniwm/blob/main/crates/sabiniwm/src/backend/mod.rs)
+//! for example (while the main reason for using `enum` is not performance in this case).
+//!
+//! ## Comparison
+//!
+//! ### [enum_dispatch](https://crates.io/crates/enum_dispatch)
+//!
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_dispatch)
+//!   - Doesn't support, e.g. external traits and [generics](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_dispatch/fail_generics.rs).
+//! - Implementation uses not safe mechanism (Using global variable in proc macro)
+//!
+//! See also [documentation of `enum_delegate`](https://docs.rs/enum_delegate/0.2.0/enum_delegate/#comparison-with-enum_dispatch).
+//!
+//! ### [enum_delegate](https://crates.io/crates/enum_delegate) (< v0.3.0)
+//!
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v020)
+//!   - Doesn't support, e.g. [super traits](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v020/fail_super_trait.rs).
+//!
+//! See also [limitations](https://docs.rs/enum_delegate/0.2.0/enum_delegate/#limitations).
+//!
+//! ### [enum_delegate](https://crates.io/crates/enum_delegate) (>= v0.3.0)
+//!
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030)
+//!   - Doesn't support, e.g.
+//!     [super traits](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030/fail_not_supported_super_trait.rs),
+//!     [associated const/type](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030/fail_not_supported_associated_const.rs).
+//! - Implementation uses very restricted mechanism.
+//!
+//! See also [limitations](https://gitlab.com/dawn_app/enum_delegate/tree/f5bcaf45#limitations).
+//!
+//! ### [auto-delegate](https://crates.io/crates/auto-delegate)
+//!
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate)
+//!   - Doesn't support, e.g. super traits,
+//!     [associated const/type](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate/fail_not_supported_associated_const.rs),
+//!     [delegating to `std` types](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate/fail_conflict_impl_trait_for_field.rs).
+//! - Supports methods without a receiver.
+//! - Implementation uses very restricted mechanism.
+//!
+//! ### [ambassader](https://crates.io/crates/ambassador)
+//!
+//! - Competitive. I recommend it if you doesn't need features/APIs of `thin_delegate`.
+//!
+//! ### [portrait](https://crates.io/crates/portrait)
+//!
+//! - Exposes a macro with the same name to the struct/enum.
 
 mod attr_remover;
 mod decl_macro;
@@ -28,6 +203,21 @@ use std::ops::Deref;
 use syn::parse_quote;
 use syn::spanned::Spanned;
 
+/// An attribute macro marking a module as "external trait definitions"
+///
+/// See [toplevel documentation](./) for fundamental usage.
+///
+/// ## Arguments
+///
+/// ### `with_uses = <bool>`
+///
+/// If `true`, `#[thin_delegate::derive_delegate]` wraps `impl Trait for StructEnum` within a module
+/// and expands the imports `use ...` in the orginal module to the expanded module. It is convenient
+/// to copy&paste the original definition as is.
+///
+/// Defaults to `false`.
+///
+/// See also [example](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_external_trait_def_with_uses.rs).
 #[proc_macro_attribute]
 pub fn external_trait_def(
     args: proc_macro::TokenStream,
@@ -108,6 +298,9 @@ pub fn __internal__is_external_marker(
         .into()
 }
 
+/// An attribute macro registering a definition of trait/struct/enum for `#[thin_delegate::derive_delegate]`
+///
+/// See [toplevel documentation](./) for fundamental usage.
 #[proc_macro_attribute]
 pub fn register(
     args: proc_macro::TokenStream,
@@ -194,6 +387,57 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
     }
 }
 
+/// An attribute macro deriving `impl` by delegation to an inner field
+///
+/// See [toplevel documentation](./) for fundamental usage.
+///
+/// ## Arguments
+///
+/// ### `external_trait_def = <path>`
+///
+/// Designates a path of module that is qualified by `#[thin_delegate::external_trait_def]` and
+/// contains the trait definition qualified with `#[thin_delegate::register]`.
+///
+/// How it works (See also [How it works](./index.html#how-it-works).):
+/// `#[thin_delegate::register]` defines a macro that contains information of a trait.
+/// Normally, `#[thin_delegate::derive_delegate]` searches the macro in current module.
+/// The argument `external_trait_def = path::to::mod` modifies it to search
+/// `path::to::mod::<macro>`.
+///
+/// ### `scheme = <closure-like>`
+///
+/// Defines a scheme to generate implementations of methods instead of the default generation
+/// algorithm.
+///
+/// ```
+/// #[thin_delegate::register]
+/// trait Hello {
+///     fn hello(&self) -> String;
+/// }
+///
+/// impl Hello for String {
+///     fn hello(&self) -> String {
+///         self.clone()
+///     }
+/// }
+///
+/// #[thin_delegate::register]
+/// struct Hoge(char);
+///
+/// impl Hoge {
+///     fn key(&self) -> String {
+///         format!("key-{}", self.0)
+///     }
+/// }
+///
+/// #[thin_delegate::derive_delegate(scheme = |f| f(&self.key()))]
+/// impl Hello for Hoge {}
+/// ```
+///
+/// A scheme is like a closure, but actually it is used more lexically; each occurrence of the
+/// parameter `f` is replaced with a trait method `Hello::hello`, like templates in C++.
+///
+/// See also [example](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_scheme_enum.rs).
 #[proc_macro_attribute]
 pub fn derive_delegate(
     args: proc_macro::TokenStream,
