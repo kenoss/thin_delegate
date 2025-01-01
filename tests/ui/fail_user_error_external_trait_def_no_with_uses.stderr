@@ -1,5 +1,5 @@
 error[E0412]: cannot find type `Arg` in this scope
-  --> tests/ui/fail_external_trait_def_no_with_uses.rs:43:27
+  --> tests/ui/fail_user_error_external_trait_def_no_with_uses.rs:43:27
    |
 43 |         fn hi(&self, arg: Arg) -> String;
    |                           ^^^ not found in this scope
@@ -14,7 +14,7 @@ help: consider importing this struct
    |
 
 warning: unused import: `crate::external::Arg`
-  --> tests/ui/fail_external_trait_def_no_with_uses.rs:31:9
+  --> tests/ui/fail_user_error_external_trait_def_no_with_uses.rs:31:9
    |
 31 |     use crate::external::Arg;
    |         ^^^^^^^^^^^^^^^^^^^^

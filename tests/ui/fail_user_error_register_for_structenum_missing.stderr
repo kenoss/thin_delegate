@@ -1,5 +1,5 @@
 error: cannot find macro `__thin_delegate__feed_structenum_def_of_Hoge` in this scope
-  --> tests/ui/fail_register_for_structenum_missing.rs:13:16
+  --> tests/ui/fail_user_error_register_for_structenum_missing.rs:13:16
    |
 1  | #[thin_delegate::register]
    | -------------------------- similarly named macro `__thin_delegate__feed_trait_def_of_Hello` defined here

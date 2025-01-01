@@ -1,4 +1,4 @@
-// Compare with fail_external_trait_def_no_with_uses.rs
+// Compare with fail_user_error_external_trait_def_no_with_uses.rs
 // See also //tests/ui/smithay/*.rs
 
 mod external {

@@ -1,5 +1,5 @@
 error: expected `trait ...` or `struct ...` or `enum ...`
- --> tests/ui/fail_register_for_invalid_item.rs:2:1
+ --> tests/ui/fail_user_error_register_for_invalid_item.rs:2:1
   |
 2 | / fn hoge() -> bool {
 3 | |     true

@@ -1,5 +1,5 @@
 error: cannot find macro `__thin_delegate__feed_trait_def_of_Hello` in this scope
-  --> tests/ui/fail_register_for_trait_and_structenum_missing.rs:13:6
+  --> tests/ui/fail_user_error_register_for_trait_and_structenum_missing.rs:13:6
    |
 13 | impl Hello for Hoge {}
    |      ^^^^^

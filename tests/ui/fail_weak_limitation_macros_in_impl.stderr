@@ -1,5 +1,5 @@
 error[E0201]: duplicate definitions with name `override_`:
-  --> tests/ui/fail_macros_in_impl.rs:4:5
+  --> tests/ui/fail_weak_limitation_macros_in_impl.rs:4:5
    |
 4  |     fn override_(&self) -> String;
    |     ^^----------------------------
