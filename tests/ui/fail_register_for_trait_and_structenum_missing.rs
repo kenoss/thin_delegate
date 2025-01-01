@@ -3,7 +3,7 @@ pub trait Hello {
     fn hello(&self, a: usize) -> String;
 }
 
-#[thin_delegate::register]
+// #[thin_delegate::register]
 enum Hoge {
     A(String),
     B(char),
