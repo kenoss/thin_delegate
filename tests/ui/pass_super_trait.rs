@@ -1,3 +1,5 @@
+// thin_delegate allows a trait has super trait.
+
 #[thin_delegate::register]
 pub trait Hello: ToString {
     fn hello(&self) -> String;

@@ -1,3 +1,5 @@
+// thin_delegate allows to use registered definition multiple times.
+
 #[thin_delegate::register]
 pub trait Hello {
     fn hello(&self) -> String;

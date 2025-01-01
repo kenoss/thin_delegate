@@ -1,3 +1,5 @@
+// thin_delegate allows trait functions to have arguments other than a receiver.
+
 #[thin_delegate::register]
 pub trait Hello {
     fn hello(&self, prefix: &str) -> String;

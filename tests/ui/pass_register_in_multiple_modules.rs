@@ -1,3 +1,5 @@
+// thin_delegate allows to register traits with the same name in different modules.
+
 mod a {
     #[thin_delegate::register]
     pub trait Hello {

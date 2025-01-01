@@ -1,3 +1,5 @@
+// thin_delegate supports generics.
+
 #[thin_delegate::external_trait_def]
 mod __external_trait_def {
     #[thin_delegate::register]

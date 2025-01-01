@@ -1,3 +1,5 @@
+// thin_delegate supports const generics.
+
 #[thin_delegate::register]
 pub trait Hello<T, const N: usize> {
     fn hello(&self) -> [T; N];
