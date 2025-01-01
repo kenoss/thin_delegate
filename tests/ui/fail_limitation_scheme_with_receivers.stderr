@@ -1,0 +1,15 @@
+error[E0277]: the trait bound `&mut usize: Hello` is not satisfied
+  --> tests/ui/fail_limitation_scheme_with_receivers.rs:35:47
+   |
+5  |     fn hello_consume(self, prefix: &str) -> String;
+   |        ------------- required by a bound introduced by this call
+...
+35 | #[thin_delegate::fill_delegate(scheme = |f| f(&mut self.key()))]
+   |                                               ^^^^^^^^^^^^^^^ the trait `Hello` is not implemented for `&mut usize`
+   |
+   = note: this error originates in the macro `__thin_delegate__trampoline2` which comes from the expansion of the attribute macro `thin_delegate::fill_delegate` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider removing the leading `&`-reference
+   |
+35 - #[thin_delegate::fill_delegate(scheme = |f| f(&mut self.key()))]
+35 + #[thin_delegate::fill_delegate(scheme = |f| f(self.key()))]
+   |
