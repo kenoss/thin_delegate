@@ -1,3 +1,5 @@
+// thin_delegate allows mutliple `#[thin_delegate::fill_delegate]` for a type and tratis.
+
 #[thin_delegate::external_trait_def]
 mod __external_trait_def {
     #[thin_delegate::register]
