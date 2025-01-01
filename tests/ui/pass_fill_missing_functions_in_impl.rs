@@ -1,3 +1,5 @@
+// `#[thin_delegate::fill_delegate]` filles missning trait functions.
+
 #[thin_delegate::register]
 trait Hello {
     type Return;
