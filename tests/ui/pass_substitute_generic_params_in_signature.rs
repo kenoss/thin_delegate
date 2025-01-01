@@ -1,3 +1,6 @@
+// This test checks that thin_delegate handles type substitution `T <- String` for `<T as Writable>`
+// in the function singnature.
+
 trait Writable {
     type Buffer<'a>: WritableBuffer + 'a
     where
