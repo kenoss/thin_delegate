@@ -340,8 +340,8 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
     let macro_def = match &item {
         syn::Item::Trait(trait_) => {
             let trait_path = syn::Path::from(syn::PathSegment::from(trait_.ident.clone()));
-            // Note that `trait_path` here is a kind of dummy. It's just used for creating `TraitData`.
-            let trait_data = TraitData::new(trait_, trait_path);
+            // Note that `args` and `trait_path` here are kinds of dummy. It's just used for validation.
+            let trait_data = TraitData::new(&FillDelegateArgs::default(), trait_, trait_path);
             trait_data.validate()?;
 
             decl_macro::define_macro_feed_trait_def_of(
@@ -392,6 +392,13 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
 /// See [toplevel documentation](./) for fundamental usage.
 ///
 /// ## Arguments
+///
+/// ### `delegate_fn_with_default_impl = <bool>`
+///
+/// By default (`false`), it doesn't fill trait functions with default implementation.
+/// If `true`, it fills them by delegation.
+///
+/// See also [example](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_delegate_fn_with_default_impl.rs).
 ///
 /// ### `external_trait_def = <path>`
 ///
@@ -977,6 +984,31 @@ mod tests {
 
                 fn filled(&self) -> Self::Return {
                     Hello::filled(&self.0)
+                }
+            }
+        },
+    }
+
+    test_internal_fill_delegate! {
+        delegate_fn_with_default_impl,
+        quote! {delegate_fn_with_default_impl = true},
+        quote! {
+            trait Hello {
+                fn skipped_if_fn_has_default_impl(&self) -> Self::Return {
+                    self.filled()
+                }
+            }
+
+            struct Hoge(String);
+
+            impl Hello for Hoge {
+                // It fills `skipped_if_fn_has_default_impl()` if `delegate_fn_with_default_impl = true`.
+            }
+        },
+        quote! {
+            impl Hello for Hoge {
+                fn skipped_if_fn_has_default_impl(&self) -> Self::Return {
+                    Hello::skipped_if_fn_has_default_impl(&self.0)
                 }
             }
         },

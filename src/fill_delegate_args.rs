@@ -3,12 +3,14 @@ use quote::TokenStreamExt;
 use syn::parse::Parse;
 
 mod kw {
+    syn::custom_keyword!(delegate_fn_with_default_impl);
     syn::custom_keyword!(external_trait_def);
     syn::custom_keyword!(scheme);
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct FillDelegateArgs {
+    pub delegate_fn_with_default_impl: bool,
     pub external_trait_def: Option<syn::Path>,
     pub scheme: Option<syn::ExprClosure>,
 }
@@ -124,15 +126,18 @@ impl FillDelegateArgs {
 
 impl Parse for FillDelegateArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let mut this = FillDelegateArgs {
-            external_trait_def: None,
-            scheme: None,
-        };
+        let mut this = FillDelegateArgs::default();
 
         let args =
             syn::punctuated::Punctuated::<ParsableArg, syn::Token![,]>::parse_terminated(input)?;
         for arg in args {
             match arg {
+                ParsableArg::DelegateFnWithDefaultImpl {
+                    delegate_fn_with_default_impl,
+                    ..
+                } => {
+                    this.delegate_fn_with_default_impl = delegate_fn_with_default_impl.value;
+                }
                 ParsableArg::ExternalTraitDef { path, .. } => {
                     this.external_trait_def = Some(path);
                 }
@@ -148,6 +153,13 @@ impl Parse for FillDelegateArgs {
 
 #[derive(Debug)]
 enum ParsableArg {
+    DelegateFnWithDefaultImpl {
+        #[allow(unused)]
+        delegate_fn_with_default_impl_kw: kw::delegate_fn_with_default_impl,
+        #[allow(unused)]
+        eq_token: syn::Token![=],
+        delegate_fn_with_default_impl: syn::LitBool,
+    },
     ExternalTraitDef {
         #[allow(unused)]
         external_trait_def_kw: kw::external_trait_def,
@@ -167,7 +179,13 @@ enum ParsableArg {
 impl Parse for ParsableArg {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
-        if lookahead.peek(kw::external_trait_def) {
+        if lookahead.peek(kw::delegate_fn_with_default_impl) {
+            Ok(ParsableArg::DelegateFnWithDefaultImpl {
+                delegate_fn_with_default_impl_kw: input.parse()?,
+                eq_token: input.parse()?,
+                delegate_fn_with_default_impl: input.parse()?,
+            })
+        } else if lookahead.peek(kw::external_trait_def) {
             Ok(ParsableArg::ExternalTraitDef {
                 external_trait_def_kw: input.parse()?,
                 eq_token: input.parse()?,
@@ -195,6 +213,7 @@ mod tests {
     fn parsable() {
         let input = quote! {};
         let expected = FillDelegateArgs {
+            delegate_fn_with_default_impl: false,
             external_trait_def: None,
             scheme: None,
         };
@@ -202,13 +221,23 @@ mod tests {
 
         let input = quote! { external_trait_def = __external_trait_def };
         let expected = FillDelegateArgs {
+            delegate_fn_with_default_impl: false,
             external_trait_def: Some(parse_quote! { __external_trait_def }),
+            scheme: None,
+        };
+        assert_eq!(syn::parse2::<FillDelegateArgs>(input).unwrap(), expected);
+
+        let input = quote! { delegate_fn_with_default_impl = true };
+        let expected = FillDelegateArgs {
+            delegate_fn_with_default_impl: true,
+            external_trait_def: None,
             scheme: None,
         };
         assert_eq!(syn::parse2::<FillDelegateArgs>(input).unwrap(), expected);
 
         let input = quote! { scheme = |f| f(&self.0.key()) };
         let expected = FillDelegateArgs {
+            delegate_fn_with_default_impl: false,
             external_trait_def: None,
             scheme: Some(parse_quote! { |f| f(&self.0.key()) }),
         };
@@ -217,6 +246,7 @@ mod tests {
         let input =
             quote! { external_trait_def = __external_trait_def, scheme = |f| f(&self.0.key()) };
         let expected = FillDelegateArgs {
+            delegate_fn_with_default_impl: false,
             external_trait_def: Some(parse_quote! { __external_trait_def }),
             scheme: Some(parse_quote! { |f| f(&self.0.key()) }),
         };

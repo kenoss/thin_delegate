@@ -15,7 +15,7 @@ pub(crate) struct TraitData {
 }
 
 impl TraitData {
-    pub fn new(trait_: &syn::ItemTrait, trait_path: syn::Path) -> Self {
+    pub fn new(args: &FillDelegateArgs, trait_: &syn::ItemTrait, trait_path: syn::Path) -> Self {
         let sigs = trait_
             .items
             .iter()
@@ -33,7 +33,7 @@ impl TraitData {
                     return None;
                 };
 
-                if fn_.default.is_some() {
+                if !args.delegate_fn_with_default_impl && fn_.default.is_some() {
                     return None;
                 }
 
@@ -140,7 +140,7 @@ pub(crate) fn gen_impl(
     structenum: &syn::Item,
     impl_: syn::ItemImpl,
 ) -> syn::Result<TokenStream> {
-    let trait_data = TraitData::new(trait_, trait_path.clone());
+    let trait_data = TraitData::new(args, trait_, trait_path.clone());
 
     let generic_param_replacer = GenericParamReplacer::new(
         &trait_data.generics,
