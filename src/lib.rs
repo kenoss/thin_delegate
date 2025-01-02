@@ -102,8 +102,9 @@
 //!     - [const](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_generics_const.rs)
 //!   - Trait bounds
 //!     - [super trait](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_super_trait.rs)
-//!     - [`where` and complex method argument](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_prevent_ambiguous_generic_params.rs)
-//! - [Only fills not implemented methods](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_items_in_impl.rs)
+//!     - [`where` and complex method argument](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_substitute_generic_params.rs)
+//!   - [GATs](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_gat.rs)
+//! - [Only fills not implemented methods](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_fill_missing_functions_in_impl.rs)
 //!
 //! ## How it works
 //!
@@ -145,35 +146,35 @@
 //!
 //! ### [enum_dispatch](https://crates.io/crates/enum_dispatch)
 //!
-//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_dispatch)
-//!   - Doesn't support, e.g. external traits and [generics](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_dispatch/fail_generics.rs).
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_dispatch)
+//!   - Doesn't support, e.g. external traits and [generics](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_dispatch/fail_generics.rs).
 //! - Implementation uses not safe mechanism (Using global variable in proc macro)
 //!
 //! See also [documentation of `enum_delegate`](https://docs.rs/enum_delegate/0.2.0/enum_delegate/#comparison-with-enum_dispatch).
 //!
 //! ### [enum_delegate](https://crates.io/crates/enum_delegate) (< v0.3.0)
 //!
-//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v020)
-//!   - Doesn't support, e.g. [super traits](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v020/fail_super_trait.rs).
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v020)
+//!   - Doesn't support, e.g. [super traits](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v020/fail_super_trait.rs).
 //!
 //! See also [limitations](https://docs.rs/enum_delegate/0.2.0/enum_delegate/#limitations).
 //!
 //! ### [enum_delegate](https://crates.io/crates/enum_delegate) (>= v0.3.0)
 //!
-//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030)
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030)
 //!   - Doesn't support, e.g.
-//!     [super traits](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030/fail_not_supported_super_trait.rs),
-//!     [associated const/type](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030/fail_not_supported_associated_const.rs).
+//!     [super traits](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030/fail_not_supported_super_trait.rs),
+//!     [associated const/type](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/enum_delegate_v030/fail_not_supported_associated_const.rs).
 //! - Implementation uses very restricted mechanism.
 //!
 //! See also [limitations](https://gitlab.com/dawn_app/enum_delegate/tree/f5bcaf45#limitations).
 //!
 //! ### [auto-delegate](https://crates.io/crates/auto-delegate)
 //!
-//! - [Limitations](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate)
+//! - [Limitations](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate)
 //!   - Doesn't support, e.g. super traits,
-//!     [associated const/type](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate/fail_not_supported_associated_const.rs),
-//!     [delegating to `std` types](https://github.com/kenoss/kenoss.github.io/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate/fail_conflict_impl_trait_for_field.rs).
+//!     [associated const/type](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate/fail_not_supported_associated_const.rs),
+//!     [delegating to `std` types](https://github.com/kenoss/kenoss.github.io/tree/main/content/blog/2025-01-01-thin_delegate_aux/tests/ui/auto-delegate/fail_conflict_impl_trait_for_field.rs).
 //! - Supports methods without a receiver.
 //! - Implementation uses very restricted mechanism.
 //!
@@ -217,7 +218,9 @@ use syn::spanned::Spanned;
 ///
 /// Defaults to `false`.
 ///
-/// See also [example](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_external_trait_def_with_uses.rs).
+/// See also examples
+/// [[pass](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_external_trait_def_with_uses.rs)]
+/// [[fail](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/fail_user_error_external_trait_def_no_with_uses.rs)].
 #[proc_macro_attribute]
 pub fn external_trait_def(
     args: proc_macro::TokenStream,
