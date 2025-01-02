@@ -1,5 +1,5 @@
-// `#[thin_delegate::fill_delegate]` fills missing trait functions. It allows to manually define
-// associated items.
+// `#[thin_delegate::fill_delegate]` fills missing trait functions that don't have default implementation.
+// It allows to manually define associated items.
 //
 // Compare with fail_intended_limitation_associated_const_misning.rs and
 // fail_intended_limitation_associated_type_missing.rs
@@ -14,6 +14,9 @@ trait Hello {
     // `thin_delegate` only can fill associated functions.
     fn filled(&self) -> Self::Return;
     fn override_(&self) -> Self::Return;
+    fn skipped_if_fn_has_default_impl(&self) -> Self::Return {
+        self.filled()
+    }
 }
 
 impl Hello for String {
@@ -52,6 +55,8 @@ impl Hello for Hoge {
     fn override_(&self) -> Self::Return {
         self.0.override_().to_uppercase()
     }
+
+    // It doesn't fill `skipped_if_fn_has_default_impl()` as it has default implementation.
 }
 
 fn main() {

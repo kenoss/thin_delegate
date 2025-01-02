@@ -20,9 +20,22 @@ impl TraitData {
             .items
             .iter()
             .filter_map(|x| {
+                // thin_delegate only fills trait item
+                //
+                // - that is trait function; and
+                //   - because there is no natural way to select correct candidate for trait
+                //     consts/types.
+                // - that doesn't have default implementation.
+                //   - because it is built on top of necessary functions in many case and we don't
+                //     need to fill them.
+
                 let syn::TraitItem::Fn(fn_) = x else {
                     return None;
                 };
+
+                if fn_.default.is_some() {
+                    return None;
+                }
 
                 Some(fn_.sig.clone())
             })

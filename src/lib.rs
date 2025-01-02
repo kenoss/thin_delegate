@@ -936,6 +936,9 @@ mod tests {
                 // `thin_delegate` only can fill associated functions.
                 fn filled(&self) -> Self::Return;
                 fn override_(&self) -> Self::Return;
+                fn skipped_if_fn_has_default_impl(&self) -> Self::Return {
+                    self.filled()
+                }
             }
 
             struct Hoge(String);
@@ -958,6 +961,8 @@ mod tests {
                 fn override_(&self) -> Self::Return {
                     self.0.override_().to_uppercase()
                 }
+
+                // It doesn't fill `skipped_if_fn_has_default_impl()` as it has default implementation.
             }
         },
         quote! {
