@@ -4,7 +4,7 @@
 - Breaking changes
   - Renamed `derive_delegate` to `fill_delegate` (9d91723)
   - Stop filling trait function with default implementation (46cc6c7)
-  - Add argument `delegate_fn_with_default_impl` of `fill_delegate` (TBD)
+  - Add argument `delegate_fn_with_default_impl` of `fill_delegate` (8ec4bb6)
 
 ## 0.0.3
 
