@@ -132,6 +132,20 @@
 //! See `fail_register_for_*.rs` in [tests](https://github.com/kenoss/thin_delegate/tree/main/tests/ui)
 //! for the exact error messages.
 //!
+//! ## Limitations
+//!
+//! There are three types of limitations of `thin_delegate`.
+//!
+//! - (Normal) limitation
+//!   - It's not feasible to support them.
+//!   - `fail_limitation_*.rs` in [tests](https://github.com/kenoss/thin_delegate/tree/main/tests/ui).
+//! - Intended limitation
+//!   - It shouldn't be supported because there is no way to avoid ambiguity or something wrong.
+//!   - `fail_intended_limitation_*.rs` in [tests](https://github.com/kenoss/thin_delegate/tree/main/tests/ui).
+//! - Weak limitation
+//!   - It's not feasible to support them, but it would be not a problem in practice.
+//!   - `fail_weak_limitation_*.rs` in [tests](https://github.com/kenoss/thin_delegate/tree/main/tests/ui).
+//!
 //! ## Performance
 //!
 //! Note that using `enum` is more performant than `Box<dyn Trait>` in general case.
