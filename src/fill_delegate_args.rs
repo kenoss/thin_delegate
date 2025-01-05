@@ -8,11 +8,21 @@ mod kw {
     syn::custom_keyword!(scheme);
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct FillDelegateArgs {
     pub delegate_fn_with_default_impl: bool,
     pub external_trait_def: Option<syn::Path>,
     pub scheme: Option<syn::ExprClosure>,
+}
+
+impl Default for FillDelegateArgs {
+    fn default() -> Self {
+        Self {
+            delegate_fn_with_default_impl: true,
+            external_trait_def: None,
+            scheme: None,
+        }
+    }
 }
 
 impl FillDelegateArgs {
@@ -213,7 +223,7 @@ mod tests {
     fn parsable() {
         let input = quote! {};
         let expected = FillDelegateArgs {
-            delegate_fn_with_default_impl: false,
+            delegate_fn_with_default_impl: true,
             external_trait_def: None,
             scheme: None,
         };
@@ -221,15 +231,15 @@ mod tests {
 
         let input = quote! { external_trait_def = __external_trait_def };
         let expected = FillDelegateArgs {
-            delegate_fn_with_default_impl: false,
+            delegate_fn_with_default_impl: true,
             external_trait_def: Some(parse_quote! { __external_trait_def }),
             scheme: None,
         };
         assert_eq!(syn::parse2::<FillDelegateArgs>(input).unwrap(), expected);
 
-        let input = quote! { delegate_fn_with_default_impl = true };
+        let input = quote! { delegate_fn_with_default_impl = false };
         let expected = FillDelegateArgs {
-            delegate_fn_with_default_impl: true,
+            delegate_fn_with_default_impl: false,
             external_trait_def: None,
             scheme: None,
         };
@@ -237,7 +247,7 @@ mod tests {
 
         let input = quote! { scheme = |f| f(&self.0.key()) };
         let expected = FillDelegateArgs {
-            delegate_fn_with_default_impl: false,
+            delegate_fn_with_default_impl: true,
             external_trait_def: None,
             scheme: Some(parse_quote! { |f| f(&self.0.key()) }),
         };
@@ -246,7 +256,7 @@ mod tests {
         let input =
             quote! { external_trait_def = __external_trait_def, scheme = |f| f(&self.0.key()) };
         let expected = FillDelegateArgs {
-            delegate_fn_with_default_impl: false,
+            delegate_fn_with_default_impl: true,
             external_trait_def: Some(parse_quote! { __external_trait_def }),
             scheme: Some(parse_quote! { |f| f(&self.0.key()) }),
         };

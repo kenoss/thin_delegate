@@ -1,4 +1,9 @@
-## 0.1.0 (not yet released)
+## 0.2.0 (not yet released)
+
+- Breaking changes
+  - Switched default value of `delegate_fn_with_default_impl` from `false` to `true`. (TBD)
+
+## 0.1.0
 
 - Add documentation
 - Breaking changes

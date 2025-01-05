@@ -411,8 +411,8 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
 ///
 /// ### `delegate_fn_with_default_impl = <bool>`
 ///
-/// By default (`false`), it doesn't fill trait functions with default implementation.
-/// If `true`, it fills them by delegation.
+/// By default (`true`), it fills trait functions by delegation.
+/// If `false`, it doesn't fill them and use default implementation.
 ///
 /// See also [example](https://github.com/kenoss/thin_delegate/blob/main/tests/ui/pass_delegate_fn_with_default_impl.rs).
 ///
@@ -959,7 +959,7 @@ mod tests {
                 // `thin_delegate` only can fill associated functions.
                 fn filled(&self) -> Self::Return;
                 fn override_(&self) -> Self::Return;
-                fn skipped_if_fn_has_default_impl(&self) -> Self::Return {
+                fn fn_with_default_impl(&self) -> Self::Return {
                     self.filled()
                 }
             }
@@ -985,7 +985,7 @@ mod tests {
                     self.0.override_().to_uppercase()
                 }
 
-                // It doesn't fill `skipped_if_fn_has_default_impl()` as it has default implementation.
+                // It also fills `fn_with_default_impl()` by delegation by default.
             }
         },
         quote! {
@@ -1001,16 +1001,24 @@ mod tests {
                 fn filled(&self) -> Self::Return {
                     Hello::filled(&self.0)
                 }
+
+                fn fn_with_default_impl(&self) -> Self::Return {
+                    Hello::fn_with_default_impl(&self.0)
+                }
             }
         },
     }
 
     test_internal_fill_delegate! {
-        delegate_fn_with_default_impl,
-        quote! {delegate_fn_with_default_impl = true},
+        delegate_fn_with_default_impl_false,
+        quote! {delegate_fn_with_default_impl = false},
         quote! {
             trait Hello {
-                fn skipped_if_fn_has_default_impl(&self) -> Self::Return {
+                type Return;
+
+                fn filled(&self) -> Self::Return;
+
+                fn fn_with_default_impl(&self) -> Self::Return {
                     self.filled()
                 }
             }
@@ -1018,13 +1026,17 @@ mod tests {
             struct Hoge(String);
 
             impl Hello for Hoge {
-                // It fills `skipped_if_fn_has_default_impl()` if `delegate_fn_with_default_impl = true`.
+                type Return = String;
+
+                // It doesn't fill `fn_with_default_impl()` if `delegate_fn_with_default_impl = false`.
             }
         },
         quote! {
             impl Hello for Hoge {
-                fn skipped_if_fn_has_default_impl(&self) -> Self::Return {
-                    Hello::skipped_if_fn_has_default_impl(&self.0)
+                type Return = String;
+
+                fn filled(&self) -> Self::Return {
+                    Hello::filled(&self.0)
                 }
             }
         },
