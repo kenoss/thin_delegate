@@ -122,8 +122,8 @@ impl<'a> FnIngredient<'a> {
             .iter()
             .filter_map(|arg| match arg {
                 syn::FnArg::Receiver(_) => None,
-                syn::FnArg::Typed(pat_type) => {
-                    let syn::Pat::Ident(ident) = pat_type.pat.as_ref() else {
+                syn::FnArg::Typed(arg) => {
+                    let syn::Pat::Ident(ident) = arg.pat.as_ref() else {
                         panic!("Pat should be an ident in function declaration position.");
                     };
                     Some(ident)
@@ -185,10 +185,8 @@ fn gen_impl_fn(
     }
 
     match item {
-        syn::Item::Enum(enum_) => gen_impl_fn_enum(generic_param_replacer, enum_, &fn_ingredient),
-        syn::Item::Struct(struct_) => {
-            gen_impl_fn_struct(generic_param_replacer, struct_, &fn_ingredient)
-        }
+        syn::Item::Enum(item) => gen_impl_fn_enum(generic_param_replacer, item, &fn_ingredient),
+        syn::Item::Struct(item) => gen_impl_fn_struct(generic_param_replacer, item, &fn_ingredient),
         _ => Err(syn::Error::new(
             item.span(),
             "expected `enum ...` or `struct ...`",

@@ -265,9 +265,9 @@ fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<T
         for mut item in &mut content.1 {
             #[allow(clippy::single_match)]
             match &mut item {
-                syn::Item::Use(use_) => {
-                    use_.attrs.push(parse_quote! { #[allow(unused)] });
-                    uses.push(use_.clone());
+                syn::Item::Use(item) => {
+                    item.attrs.push(parse_quote! { #[allow(unused)] });
+                    uses.push(item.clone());
                 }
                 _ => {}
             }
@@ -281,17 +281,17 @@ fn external_trait_def_aux(args: TokenStream, item: TokenStream) -> syn::Result<T
     for item in &mut content.1 {
         #[allow(clippy::single_match)]
         match item {
-            syn::Item::Trait(ref mut trait_) => {
+            syn::Item::Trait(ref mut item) => {
                 let attr = parse_quote! {
                     #[::thin_delegate::__internal__is_external_marker]
                 };
-                trait_.attrs.push(attr);
+                item.attrs.push(attr);
 
                 if let Some(uses) = &uses {
                     let attr = parse_quote! {
                         #[::thin_delegate::__internal__with_uses(#uses)]
                     };
-                    trait_.attrs.push(attr);
+                    item.attrs.push(attr);
                 }
             }
             _ => {}
@@ -342,30 +342,29 @@ fn register_aux(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream
         )
     })?;
     let is_external = match &item {
-        syn::Item::Trait(trait_) => {
+        syn::Item::Trait(item) => {
             #[allow(non_snake_case)]
             let __internal__is_external_marker: syn::Attribute = parse_quote! {
                 #[::thin_delegate::__internal__is_external_marker]
             };
-            trait_
-                .attrs
+            item.attrs
                 .iter()
                 .any(|attr| *attr == __internal__is_external_marker)
         }
         _ => false,
     };
     let macro_def = match &item {
-        syn::Item::Trait(trait_) => {
-            let trait_path = syn::Path::from(syn::PathSegment::from(trait_.ident.clone()));
+        syn::Item::Trait(item) => {
+            let trait_path = syn::Path::from(syn::PathSegment::from(item.ident.clone()));
             // Note that `args` and `trait_path` here are kinds of dummy. It's just used for validation.
-            let trait_data = TraitData::new(&FillDelegateArgs::default(), trait_, trait_path);
+            let trait_data = TraitData::new(&FillDelegateArgs::default(), item, trait_path);
             trait_data.validate()?;
 
             decl_macro::define_macro_feed_trait_def_of(
-                &trait_.ident,
-                trait_.ident.span(),
+                &item.ident,
+                item.ident.span(),
                 is_external,
-                trait_,
+                item,
             )
         }
         syn::Item::Struct(structenum) => decl_macro::define_macro_feed_structenum_def_of(
